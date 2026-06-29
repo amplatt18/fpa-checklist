@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#378ADD"/>
+
+
+<title>FP&A Monthly Checklist</title>
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg1:#ffffff;--bg2:#f5f5f0;--bg3:#eeede8;
+  --t1:#1a1a18;--t2:#5f5e5a;--t3:#888780;
+  --b1:rgba(0,0,0,0.11);--b2:rgba(0,0,0,0.20);
+  --r1:8px;--r2:12px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --accent:#378ADD;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg1:#1e1e1c;--bg2:#2a2a28;--bg3:#141412;
+    --t1:#f0ede8;--t2:#b4b2a9;--t3:#888780;
+    --b1:rgba(255,255,255,0.09);--b2:rgba(255,255,255,0.17);
+  }
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg3);color:var(--t1);}
+body{display:flex;flex-direction:column;}
+
+/* App shell */
+.app-header{background:var(--bg1);border-bottom:0.5px solid var(--b1);padding:0 1rem;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:50;}
+.app-title{font-size:15px;font-weight:500;color:var(--t1);}
+.header-nav{display:flex;align-items:center;gap:6px;}
+.btn{background:transparent;border:0.5px solid var(--b2);border-radius:var(--r1);padding:5px 12px;cursor:pointer;font-size:13px;color:var(--t2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn:hover{background:var(--bg2);}
+.btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn-icon{padding:5px 9px;}
+.main{flex:1;overflow-y:auto;padding:1rem;}
+.inner{max-width:1100px;margin:0 auto;}
+
+/* Month nav */
+.month-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
+.month-label{font-size:18px;font-weight:500;color:var(--t1);}
+.month-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
+.stat{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r1);padding:10px 12px;}
+.stat-label{font-size:10px;color:var(--t3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px;}
+.stat-val{font-size:20px;font-weight:500;color:var(--t1);}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr);}}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.legend-chip{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--t2);background:var(--bg1);border:0.5px solid var(--b1);border-radius:20px;padding:3px 10px 3px 6px;}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* ── CALENDAR VIEW ── */
+.drag-hint{font-size:11px;color:var(--t3);margin-bottom:8px;display:flex;align-items:center;gap:4px;}
+.cal-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;}
+.day-hdr{font-size:10px;font-weight:500;color:var(--t3);text-align:center;padding:3px 0;}
+.day-cell{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r1);min-height:110px;padding:7px;transition:border-color .1s,background .1s;}
+.day-cell.empty{background:transparent;border:none;}
+.day-cell.today{border-color:var(--accent);}
+.day-cell.drag-over{border-color:#1D9E75;background:rgba(29,158,117,.07);}
+.day-num{font-size:11px;font-weight:500;color:var(--t2);margin-bottom:3px;}
+.day-cell.today .day-num{color:var(--accent);}
+.cal-items{display:flex;flex-direction:column;gap:2px;}
+.cal-item{display:flex;align-items:center;gap:4px;font-size:11px;line-height:1.5;border-radius:3px;padding:2px 3px;cursor:grab;user-select:none;}
+.cal-item:active{cursor:grabbing;}
+.cal-item.dragging{opacity:.3;}
+.cal-item .cbar{width:3px;height:14px;border-radius:2px;flex-shrink:0;}
+.cal-item .cname{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:160px;color:var(--t2);flex:1;}
+.cal-item .ccb{width:11px;height:11px;border-radius:3px;border:0.5px solid var(--b2);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;margin-left:auto;}
+.cal-item .ccb.on{border-color:#1D9E75;background:#1D9E75;}
+.moved-pip{width:5px;height:5px;border-radius:50%;background:#BA7517;flex-shrink:0;}
+.prog-wrap{margin-top:3px;height:2px;background:var(--b1);border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;background:#1D9E75;border-radius:2px;}
+.more-lbl{font-size:9px;color:var(--t3);margin-top:2px;}
+
+/* ── LIST VIEW ── */
+.list-view{display:flex;flex-direction:column;gap:6px;}
+.list-day-group{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r2);overflow:hidden;}
+.list-day-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid var(--b1);cursor:pointer;user-select:none;}
+.list-day-hdr:hover{background:var(--bg2);}
+.list-day-title{font-size:14px;font-weight:500;color:var(--t1);display:flex;align-items:center;gap:8px;}
+.list-day-date{font-size:12px;color:var(--t3);}
+.list-day-prog{font-size:12px;color:var(--t3);}
+.list-day-badge{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg2);color:var(--t3);}
+.list-day-badge.done{background:rgba(29,158,117,.12);color:#1D9E75;}
+.list-tasks{display:flex;flex-direction:column;}
+.list-task{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--b1);cursor:pointer;transition:background .1s;}
+.list-task:last-child{border-bottom:none;}
+.list-task:hover{background:var(--bg2);}
+.list-task.done-task .list-task-name{color:var(--t3);text-decoration:line-through;}
+.list-task-bar{width:4px;height:20px;border-radius:2px;flex-shrink:0;}
+.list-task-info{flex:1;min-width:0;}
+.list-task-name{font-size:13px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.list-task-meta{font-size:11px;color:var(--t3);margin-top:1px;display:flex;align-items:center;gap:8px;}
+.list-task-owner{display:inline-flex;align-items:center;gap:3px;}
+.list-task-check{width:20px;height:20px;border-radius:5px;border:0.5px solid var(--b2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.list-task-check.on{border-color:#1D9E75;background:#1D9E75;}
+.list-moved-badge{font-size:10px;color:#BA7517;background:rgba(186,117,23,.12);border-radius:3px;padding:1px 5px;}
+.list-day-collapsed .list-tasks{display:none;}
+.list-task{cursor:grab;}
+.list-task:active{cursor:grabbing;}
+.list-task.dragging{opacity:.3;pointer-events:none;}
+.list-day-group.list-drag-over{border-color:#1D9E75;box-shadow:0 0 0 2px rgba(29,158,117,.18);}
+.list-drag-handle{color:var(--t3);font-size:14px;flex-shrink:0;cursor:grab;padding:0 2px;}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.filter-btn{font-size:12px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--b2);background:transparent;cursor:pointer;color:var(--t2);}
+.filter-btn:hover{background:var(--bg2);}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* Panel */
+.panel{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r2);padding:1.25rem;margin-bottom:1rem;}
+.panel-tabs{display:flex;gap:0;margin-bottom:1rem;border-bottom:0.5px solid var(--b1);}
+.ptab{background:none;border:none;border-bottom:2px solid transparent;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--t3);margin-bottom:-0.5px;}
+.ptab.active{color:var(--t1);border-bottom-color:var(--accent);font-weight:500;}
+.ptab:hover{color:var(--t2);}
+.psection{display:none;}
+.psection.active{display:block;}
+.section-hint{font-size:12px;color:var(--t3);margin-bottom:1rem;}
+
+/* Group cards */
+.group-list{display:flex;flex-direction:column;gap:6px;margin-bottom:1rem;}
+.group-card{background:var(--bg2);border:0.5px solid var(--b1);border-radius:var(--r1);padding:9px 12px;display:flex;align-items:center;gap:8px;}
+.group-swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.group-name{font-size:13px;font-weight:500;color:var(--t1);flex:1;}
+.group-count{font-size:11px;color:var(--t3);}
+.group-rm{background:none;border:none;cursor:pointer;color:var(--t3);padding:0;}
+.group-rm:hover{color:#e24b4a;}
+.color-options{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.color-opt{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
+.color-opt.selected{border-color:var(--t1);}
+
+/* Task rows in panel */
+.ptask-list{display:flex;flex-direction:column;gap:6px;margin-bottom:1rem;}
+.ptask-row{background:var(--bg2);border:0.5px solid var(--b1);border-radius:var(--r1);padding:8px 12px;}
+.ptask-top{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.ptask-bar{width:3px;height:16px;border-radius:2px;flex-shrink:0;}
+.ptask-name{font-size:13px;font-weight:500;color:var(--t1);flex:1;}
+.ptask-group{font-size:11px;color:var(--t3);margin-right:6px;}
+.ptask-owner{font-size:11px;color:var(--t3);}
+.ptask-rm{background:none;border:none;cursor:pointer;color:var(--t3);padding:0;}
+.ptask-rm:hover{color:#e24b4a;}
+.ptask-days-lbl{font-size:11px;color:var(--t3);margin-bottom:5px;}
+.day-picker{display:flex;flex-wrap:wrap;gap:3px;}
+.dpip{width:24px;height:24px;border-radius:50%;border:0.5px solid var(--b2);background:transparent;cursor:pointer;font-size:10px;color:var(--t2);display:flex;align-items:center;justify-content:center;}
+.dpip:hover{background:var(--bg1);}
+.dpip.on{color:#fff;border-color:transparent;}
+
+/* Add forms */
+.add-form{border-top:0.5px solid var(--b1);padding-top:1rem;margin-top:.5rem;}
+.add-form h3{font-size:13px;font-weight:500;color:var(--t2);margin-bottom:10px;}
+.form-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+.form-row input,.form-row select{font-size:13px;padding:6px 10px;border:0.5px solid var(--b2);border-radius:var(--r1);background:var(--bg3);color:var(--t1);}
+.form-row input{flex:1;min-width:140px;}
+.form-lbl{font-size:12px;color:var(--t3);margin-bottom:5px;}
+.new-dpick{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;}
+
+.saved{font-size:11px;color:var(--t3);text-align:right;padding:8px 0 0;}
+
+/* Unscheduled tasks banner */
+.unscheduled-banner{background:var(--bg1);border:0.5px solid rgba(186,117,23,.4);border-radius:var(--r2);padding:12px 16px;margin-bottom:1rem;}
+.unscheduled-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--t1);margin-bottom:10px;}
+.unscheduled-title i{color:#BA7517;}
+.unscheduled-list{display:flex;flex-direction:column;gap:6px;}
+.unscheduled-row{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--bg2);border-radius:var(--r1);}
+.unscheduled-bar{width:3px;height:16px;border-radius:2px;flex-shrink:0;}
+.unscheduled-info{flex:1;min-width:0;}
+.unscheduled-name{font-size:13px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.unscheduled-meta{font-size:11px;color:var(--t3);margin-top:1px;}
+.unscheduled-assign{font-size:12px;padding:4px 10px;border-radius:var(--r1);border:0.5px solid var(--b2);background:transparent;cursor:pointer;color:#BA7517;white-space:nowrap;}
+.unscheduled-assign:hover{background:rgba(186,117,23,.08);}
+
+/* Assign day modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:200;}
+.modal-box{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r2);padding:1.5rem;width:90%;max-width:380px;max-height:90vh;overflow-y:auto;}
+.modal-box h3{font-size:15px;font-weight:500;color:var(--t1);margin-bottom:4px;}
+.modal-box .modal-sub{font-size:12px;color:var(--t3);margin-bottom:16px;}
+.modal-wkday-pick{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px;}
+.wkd-btn{min-width:52px;padding:6px 8px;border-radius:var(--r1);border:0.5px solid var(--b2);background:transparent;cursor:pointer;font-size:12px;color:var(--t2);text-align:center;}
+.wkd-btn:hover{background:var(--bg2);}
+.wkd-btn.selected{border-color:#1D9E75;background:rgba(29,158,117,.12);color:#1D9E75;font-weight:500;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.modal-cancel{font-size:13px;padding:7px 14px;border-radius:var(--r1);border:0.5px solid var(--b2);background:transparent;cursor:pointer;color:var(--t2);}
+.modal-cancel:hover{background:var(--bg2);}
+.modal-confirm{font-size:13px;padding:7px 14px;border-radius:var(--r1);border:0.5px solid #1D9E75;background:#1D9E75;cursor:pointer;color:#fff;}
+.modal-confirm:hover{opacity:.9;}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <span class="app-title"><i class="ti ti-checkbox" style="font-size:16px;vertical-align:-2px;margin-right:6px;color:var(--accent)"></i>FP&A Checklist</span>
+  <div class="header-nav">
+    <button class="btn btn-icon" id="btn-cal" onclick="setView('cal')" title="Calendar view"><i class="ti ti-calendar"></i></button>
+    <button class="btn btn-icon" id="btn-list" onclick="setView('list')" title="List view"><i class="ti ti-list"></i></button>
+    <button class="btn btn-icon" onclick="togglePanel()" title="Manage"><i class="ti ti-settings"></i></button>
+  </div>
+</header>
+
+<main class="main">
+  <div class="inner">
+    <div id="app"></div>
+    <p class="saved" id="save-notice"></p>
+  </div>
+</main>
+
+<script>
+const PALETTE=[
+  {name:'blue',hex:'#378ADD'},{name:'teal',hex:'#1D9E75'},
+  {name:'coral',hex:'#D85A30'},{name:'purple',hex:'#7F77DD'},
+  {name:'amber',hex:'#BA7517'},{name:'pink',hex:'#D4537E'},
+  {name:'green',hex:'#639922'},{name:'gray',hex:'#888780'},
+];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// ── WORKDAY ENGINE ──
+function getFederalHolidays(year) {
+  const h = new Set();
+  function addDate(d) {
+    // Observe: Sat->Fri, Sun->Mon
+    const day = d.getDay();
+    if (day === 6) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+    else if (day === 0) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    h.add(d.toISOString().slice(0,10));
+  }
+  function nthWeekday(y, m, wd, n) {
+    let d = new Date(y, m, 1), count = 0;
+    while (true) {
+      if (d.getDay() === wd) { count++; if (count === n) return d; }
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+  }
+  function lastWeekday(y, m, wd) {
+    let d = new Date(y, m + 1, 0);
+    while (d.getDay() !== wd) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+    return d;
+  }
+  // New Year's
+  addDate(new Date(year, 0, 1));
+  // MLK - 3rd Mon Jan
+  h.add(nthWeekday(year, 0, 1, 3).toISOString().slice(0,10));
+  // Presidents - 3rd Mon Feb
+  h.add(nthWeekday(year, 1, 1, 3).toISOString().slice(0,10));
+  // Memorial - last Mon May
+  h.add(lastWeekday(year, 4, 1).toISOString().slice(0,10));
+  // Juneteenth - Jun 19
+  addDate(new Date(year, 5, 19));
+  // Independence - Jul 4
+  addDate(new Date(year, 6, 4));
+  // Labor - 1st Mon Sep
+  h.add(nthWeekday(year, 8, 1, 1).toISOString().slice(0,10));
+  // Columbus - 2nd Mon Oct
+  h.add(nthWeekday(year, 9, 1, 2).toISOString().slice(0,10));
+  // Veterans - Nov 11
+  addDate(new Date(year, 10, 11));
+  // Thanksgiving - 4th Thu Nov
+  h.add(nthWeekday(year, 10, 4, 4).toISOString().slice(0,10));
+  // Christmas - Dec 25
+  addDate(new Date(year, 11, 25));
+  return h;
+}
+
+// Cache holidays per year
+const _holidayCache = {};
+function getHolidays(year) {
+  if (!_holidayCache[year]) _holidayCache[year] = getFederalHolidays(year);
+  return _holidayCache[year];
+}
+
+function isWorkday(year, month, day) {
+  const d = new Date(year, month, day);
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return false;
+  return !getHolidays(year).has(d.toISOString().slice(0,10));
+}
+
+// Returns the calendar day number for the nth workday of year/month
+// Returns null if month has fewer workdays
+function workdayToCalDay(year, month, n) {
+  const daysInMon = new Date(year, month + 1, 0).getDate();
+  let count = 0;
+  for (let d = 1; d <= daysInMon; d++) {
+    if (isWorkday(year, month, d)) {
+      count++;
+      if (count === n) return d;
+    }
+  }
+  return null;
+}
+
+// Returns the nth workday number for a given calendar day (or null if it's not a workday)
+function calDayToWorkday(year, month, calDay) {
+  if (!isWorkday(year, month, calDay)) return null;
+  let count = 0;
+  for (let d = 1; d <= calDay; d++) {
+    if (isWorkday(year, month, d)) count++;
+  }
+  return count;
+}
+
+// ── DEFAULT DATA from spreadsheet ──
+function defaultState(){
+  return {
+    year:new Date().getFullYear(),
+    month:new Date().getMonth(),
+    view:'cal',
+    groups:[
+      {id:1,name:'ME Close',color:'#378ADD'},
+      {id:2,name:'Reporting',color:'#1D9E75'},
+      {id:3,name:'Forecast',color:'#7F77DD'},
+      {id:4,name:'Marketing',color:'#D85A30'},
+      {id:5,name:'SLT',color:'#BA7517'},
+    ],
+    tasks:[
+      // Alex — ME Close
+      {id:1,groupId:1,owner:'Alex',name:'Marketing Spend Summary for Accounting (NFL/NHL/NBA)',days:[2]},
+      {id:2,groupId:1,owner:'Alex',name:'LBE vs Actuals Email to SLT',days:[6]},
+      // Alex — Reporting
+      {id:3,groupId:2,owner:'Alex',name:'BOD Updates with NA Resale pacing YTD',days:[],weekPattern:'alt-tue'},
+      // Alex — Marketing
+      {id:4,groupId:4,owner:'Alex',name:'NFL Enterprise ETS measurement',days:[20]},
+      // Alex — Forecast
+      {id:5,groupId:3,owner:'Alex',name:'Canada Forecast (LBE)',days:[7]},
+      // Jean — ME Close
+      {id:6,groupId:1,owner:'Jean',name:'Update MTD and STD ETS Tracker (NBA/NHL Regular Season)',days:[4]},
+      {id:7,groupId:1,owner:'Jean',name:'Send Margin Summary Slide to Revman',days:[6]},
+      {id:8,groupId:1,owner:'Jean',name:'Month End GTV Reconciliation',days:[3]},
+      {id:9,groupId:1,owner:'Jean',name:'Top 10 Events Reporting for Month End',days:[2]},
+      {id:10,groupId:1,owner:'Jean',name:'Resale Refunds Booked (monthly tracking)',days:[2]},
+      {id:11,groupId:1,owner:'Jean',name:'GTV Build and GTV/Tickets/Orders Metrics Load into BPC',days:[2]},
+      {id:12,groupId:1,owner:'Jean',name:'Create Final LBE at End of Month vs Actuals',days:[4]},
+      {id:13,groupId:1,owner:'Jean',name:'Provide Accounting Shipping Expense by League',days:[4]},
+      {id:14,groupId:1,owner:'Jean',name:'Provide 3PE ETS to RevMan',days:[6]},
+      {id:15,groupId:1,owner:'Jean',name:'Provide Theater P&L to David Seif',days:[6]},
+      {id:16,groupId:1,owner:'Jean',name:'Updated Marketing Spend by Category for Justin',days:[6]},
+      // Jean — Reporting
+      {id:17,groupId:2,owner:'Jean',name:'Update Fixed Cost Social & TE Tracker',days:[10]},
+      // Jean — SLT
+      {id:18,groupId:5,owner:'Jean',name:'Weekly Pacing Report Update',days:[],weekPattern:'every-mon'},
+      // Jean — Forecast
+      {id:19,groupId:3,owner:'Jean',name:'Update LBE Gross GTV by Day in Domo Dashboard',days:[10]},
+      // Alex — Reporting
+      {id:20,groupId:2,owner:'Alex',name:'Update John Taylor File and Upload to Box',days:[10]},
+      // Alex — Marketing
+      {id:21,groupId:4,owner:'Alex',name:'Marketing Cap Spend Tracker',days:[],weekPattern:'1st-3rd-wed'},
+      {id:22,groupId:4,owner:'Alex',name:'Update NFL Tracker and ETS Guidance to Marketing',days:[16]},
+      // Alex — ME Close
+      {id:23,groupId:1,owner:'Alex',name:'NBA/NHL Playoff Deferrals',days:[2]},
+      {id:24,groupId:1,owner:'Alex',name:'Pull International Results from BPC',days:[6]},
+      {id:25,groupId:1,owner:'Alex',name:'Update International External Reports',days:[15]},
+      {id:26,groupId:1,owner:'Alex',name:'Month End Close Deck (charts/data/comments)',days:[6]},
+      {id:27,groupId:1,owner:'Alex',name:'Updating Monthly Financial Package Excel',days:[6]},
+      {id:28,groupId:1,owner:'Alex',name:'Prepare Shadow P&Ls with Month End Results',days:[6]},
+      {id:29,groupId:1,owner:'Alex',name:'Email Jean to Check Fixed Costs Tie and Shadows',days:[6]},
+      {id:30,groupId:1,owner:'Alex',name:'Update P&Ls by League and Month with ME Actuals',days:[6]},
+      {id:31,groupId:1,owner:'Alex',name:'Send ETS Summary Slides to Marketing',days:[6]},
+      {id:32,groupId:1,owner:'Alex',name:'Global Reporting — Monthly Actuals',days:[6]},
+      // Alex — Forecast
+      {id:33,groupId:3,owner:'Alex',name:'Update LBE Concerts Forecast File',days:[8]},
+      {id:34,groupId:3,owner:'Alex',name:'Update LBE (GTV/Fees/Royalties/etc.)',days:[8]},
+      {id:35,groupId:3,owner:'Alex',name:'Update Fixed Cost LBE',days:[8]},
+      {id:36,groupId:3,owner:'Alex',name:'Upload LBE into BPC',days:[10]},
+      {id:37,groupId:3,owner:'Alex',name:'Update LBE GTV into Google Sheet by Category',days:[10]},
+      {id:38,groupId:3,owner:'Alex',name:'Update LBE vs Actuals File for Variance Analysis',days:[6]},
+      {id:39,groupId:3,owner:'Alex',name:'Send Jean Marketing from Submitted LBE',days:[15]},
+      // Jean — Marketing (seasonal)
+      {id:40,groupId:4,owner:'Jean',name:'US Open Marketing Management',days:[],weekPattern:'every-mon'},
+    ],
+    checks:{},
+    overrides:{},
+    nextGroupId:10,
+    nextTaskId:50
+  };
+}
+
+function loadState(){
+  try{const s=localStorage.getItem('fpa_v1');if(s)return JSON.parse(s);}catch(e){}
+  return defaultState();
+}
+
+let S=loadState();
+let showPanel=false;
+let activeTab='tasks';
+let newTaskDays=[];
+let selGroupColor=PALETTE[0].hex;
+let filterOwner='all';
+let filterGroup='all';
+let listCollapsed={};
+
+// drag
+let dragTaskId=null,dragFromDay=null,dragBaseDay=null;
+
+// assign modal
+let assignModal=null; // {taskId, baseDay, selectedCalDay}
+
+function save(){
+  try{
+    localStorage.setItem('fpa_v1',JSON.stringify(S));
+    const el=document.getElementById('save-notice');
+    if(el)el.textContent='Saved · '+new Date().toLocaleTimeString();
+  }catch(e){}
+}
+
+function mKey(){return`${S.year}-${S.month}`;}
+function cKey(d){return`${S.year}-${S.month}-${d}`;}
+function getChecks(d){return S.checks[cKey(d)]||{};}
+function dim(){return new Date(S.year,S.month+1,0).getDate();}
+function fdow(){return new Date(S.year,S.month,1).getDay();}
+function groupColor(gid){const g=S.groups.find(x=>x.id===gid);return g?g.color:'#888';}
+function groupName(gid){const g=S.groups.find(x=>x.id===gid);return g?g.name:'—';}
+
+// Resolve weekPattern tasks to actual days for this month/year
+function resolveWeekPattern(task){
+  const p=task.weekPattern;
+  if(!p)return task.days;
+  const days=[];
+  const totalDays=dim();
+  const year=S.year,month=S.month;
+  if(p==='every-mon'||p==='every-mon-seasonal'){
+    for(let d=1;d<=totalDays;d++){
+      if(new Date(year,month,d).getDay()===1)days.push(d);
+    }
+  } else if(p==='alt-tue'){
+    let count=0;
+    for(let d=1;d<=totalDays;d++){
+      if(new Date(year,month,d).getDay()===2){count++;if(count%2===1)days.push(d);}
+    }
+  } else if(p==='1st-3rd-wed'){
+    let count=0;
+    for(let d=1;d<=totalDays;d++){
+      if(new Date(year,month,d).getDay()===3){count++;if(count===1||count===3)days.push(d);}
+    }
+  }
+  return days;
+}
+
+function effectiveDays(task){
+  if (task.weekPattern) return resolveWeekPattern(task);
+  // task.days are workday numbers — convert to calendar days for current month
+  return task.days.map(wd => workdayToCalDay(S.year, S.month, wd)).filter(d => d !== null);
+}
+
+function effectiveDay(taskId,baseDay){
+  const mo=S.overrides[mKey()];
+  if(mo&&mo[`${taskId}_${baseDay}`]!==undefined)return mo[`${taskId}_${baseDay}`];
+  return baseDay;
+}
+
+function tasksForDay(day){
+  const result=[];
+  S.tasks.forEach(task=>{
+    if(filterOwner!=='all'&&task.owner!==filterOwner)return;
+    if(filterGroup!=='all'&&task.groupId!==parseInt(filterGroup))return;
+    const baseDays=effectiveDays(task);
+    baseDays.forEach(baseDay=>{
+      if(effectiveDay(task.id,baseDay)===day){
+        result.push({task,baseDay,isOverridden:effectiveDay(task.id,baseDay)!==baseDay});
+      }
+    });
+  });
+  return result;
+}
+
+function isChecked(day,taskId,baseDay){
+  return !!(S.checks[cKey(day)]||{})[`${taskId}_${baseDay}`];
+}
+
+function toggleCheck(day,taskId,baseDay){
+  const k=cKey(day);
+  if(!S.checks[k])S.checks[k]={};
+  S.checks[k][`${taskId}_${baseDay}`]=!S.checks[k][`${taskId}_${baseDay}`];
+  save();render();
+}
+
+function applyOverride(taskId,baseDay,toDay){
+  if(!S.overrides[mKey()])S.overrides[mKey()]={};
+  if(toDay===baseDay)delete S.overrides[mKey()][`${taskId}_${baseDay}`];
+  else S.overrides[mKey()][`${taskId}_${baseDay}`]=toDay;
+  save();render();
+}
+
+function prevMonth(){if(S.month===0){S.month=11;S.year--;}else S.month--;save();render();}
+function nextMonth(){if(S.month===11){S.month=0;S.year++;}else S.month++;save();render();}
+function setView(v){S.view=v;save();render();}
+function togglePanel(){showPanel=!showPanel;render();}
+function switchTab(t){activeTab=t;render();}
+function setFilterOwner(v){filterOwner=v;render();}
+function setFilterGroup(v){filterGroup=v;render();}
+function toggleDayCollapse(d){listCollapsed[d]=!listCollapsed[d];render();}
+
+function monthStats(){
+  const days=dim();
+  let total=0,possible=0,perfectDays=0;
+  for(let d=1;d<=days;d++){
+    const items=tasksForDay(d);
+    if(!items.length)continue;
+    const done=items.filter(({task,baseDay})=>isChecked(d,task.id,baseDay)).length;
+    total+=done;possible+=items.length;
+    if(done===items.length)perfectDays++;
+  }
+  const daysWithTasks=[...new Set(Array.from({length:days},(_,i)=>i+1).filter(d=>tasksForDay(d).length>0))].length;
+  return{total,possible,perfectDays,pct:possible>0?Math.round(total/possible*100):0,daysWithTasks};
+}
+
+function getUnscheduledTasks(){
+  // Tasks whose workday falls outside this month's workday count
+  const results=[];
+  S.tasks.forEach(task=>{
+    if(task.weekPattern)return; // week-pattern tasks handle themselves
+    task.days.forEach(wd=>{
+      const calDay=workdayToCalDay(S.year,S.month,wd);
+      if(calDay===null){
+        // Check if there's already a month override for this
+        const mo=S.overrides[mKey()];
+        const hasOverride=mo&&mo[`${task.id}_${wd}`]!==undefined;
+        if(!hasOverride)results.push({task,workday:wd});
+      }
+    });
+  });
+  // Apply filters
+  return results.filter(({task})=>{
+    if(filterOwner!=='all'&&task.owner!==filterOwner)return false;
+    if(filterGroup!=='all'&&task.groupId!==parseInt(filterGroup))return false;
+    return true;
+  });
+}
+
+function openAssignModal(taskId,workday){
+  assignModal={taskId,workday,selectedCalDay:null};
+  render();
+}
+function closeAssignModal(){assignModal=null;render();}
+function selectAssignDay(calDay){
+  if(assignModal)assignModal.selectedCalDay=calDay;
+  render();
+}
+function confirmAssign(){
+  if(!assignModal||!assignModal.selectedCalDay)return;
+  // Store as override: from workday (as sentinel -workday) to calDay
+  if(!S.overrides[mKey()])S.overrides[mKey()]={};
+  S.overrides[mKey()][`${assignModal.taskId}_${assignModal.workday}`]=assignModal.selectedCalDay;
+  assignModal=null;
+  save();render();
+}
+
+function toggleTaskDay(taskId,day){
+  const t=S.tasks.find(x=>x.id===taskId);
+  if(!t)return;
+  if(t.days.includes(day))t.days=t.days.filter(d=>d!==day);
+  else t.days.push(day);
+  t.days.sort((a,b)=>a-b);
+  save();render();
+}
+function toggleNewDay(day){
+  if(newTaskDays.includes(day))newTaskDays=newTaskDays.filter(d=>d!==day);
+  else newTaskDays.push(day);
+  render();
+}
+function removeTask(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();render();}
+function addTask(){
+  const ne=document.getElementById('nt-name');
+  const ge=document.getElementById('nt-group');
+  const oe=document.getElementById('nt-owner');
+  const name=(ne.value||'').trim();
+  if(!name){ne.focus();return;}
+  if(!ge.value){alert('Select a group.');return;}
+  if(newTaskDays.length===0){alert('Select at least one day.');return;}
+  S.tasks.push({id:S.nextTaskId++,groupId:parseInt(ge.value),owner:oe.value,name,days:[...newTaskDays].sort((a,b)=>a-b)});
+  newTaskDays=[];
+  save();render();
+}
+function addGroup(){
+  const ne=document.getElementById('ng-name');
+  const name=(ne.value||'').trim();
+  if(!name){ne.focus();return;}
+  S.groups.push({id:S.nextGroupId++,name,color:selGroupColor});
+  save();render();
+}
+function removeGroup(id){
+  if(S.tasks.some(t=>t.groupId===id)){
+    if(!confirm('Remove group and all its tasks?'))return;
+    S.tasks=S.tasks.filter(t=>t.groupId!==id);
+  }
+  S.groups=S.groups.filter(g=>g.id!==id);
+  save();render();
+}
+function selectGroupColor(hex){selGroupColor=hex;render();}
+
+// ── DRAG ──
+function onDragStart(e){
+  dragTaskId=parseInt(e.currentTarget.dataset.tid);
+  dragFromDay=parseInt(e.currentTarget.dataset.fday);
+  dragBaseDay=parseInt(e.currentTarget.dataset.bday);
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain','drag');
+  setTimeout(()=>e.currentTarget.classList.add('dragging'),0);
+}
+function onDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.day-cell').forEach(c=>c.classList.remove('drag-over'));
+  dragTaskId=null;dragFromDay=null;dragBaseDay=null;
+}
+function onDragOver(e,toDay){
+  e.preventDefault();
+  document.querySelectorAll('.day-cell').forEach(c=>c.classList.remove('drag-over'));
+  if(toDay!==dragFromDay)e.currentTarget.classList.add('drag-over');
+  e.dataTransfer.dropEffect='move';
+}
+function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function onDrop(e,toDay){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!dragTaskId||toDay===dragFromDay)return;
+  if(toDay<1||toDay>dim())return;
+  applyOverride(dragTaskId,dragBaseDay,toDay);
+}
+
+// ── RENDER ──
+function render(){
+  const app=document.getElementById('app');
+  const today=new Date();
+  const isCurMon=today.getFullYear()===S.year&&today.getMonth()===S.month;
+  const todayDate=today.getDate();
+  const totalDays=dim();
+  const firstDay=fdow();
+  const stats=monthStats();
+
+  // Update view toggle buttons
+  document.getElementById('btn-cal').classList.toggle('active',S.view==='cal');
+  document.getElementById('btn-list').classList.toggle('active',S.view==='list');
+
+  // Legend
+  const legendHtml=S.groups.map(g=>`<div class="legend-chip"><div class="legend-dot" style="background:${g.color}"></div>${g.name}</div>`).join('');
+
+  // Filter bar
+  const owners=[...new Set(S.tasks.map(t=>t.owner))].sort();
+  const ownerBtns=['all',...owners].map(o=>`<button class="filter-btn${filterOwner===o?' active':''}" onclick="setFilterOwner('${o}')">${o==='all'?'All owners':o}</button>`).join('');
+  const groupBtns=['all',...S.groups.map(g=>g.id)].map(v=>`<button class="filter-btn${filterGroup===(v==='all'?'all':v.toString())?' active':''}" onclick="setFilterGroup('${v}')">${v==='all'?'All groups':groupName(v)}</button>`).join('');
+
+  // Stats
+  const statsHtml=`<div class="stats">
+    <div class="stat"><div class="stat-label">Completion</div><div class="stat-val">${stats.pct}%</div></div>
+    <div class="stat"><div class="stat-label">Done</div><div class="stat-val">${stats.total}/${stats.possible}</div></div>
+    <div class="stat"><div class="stat-label">Perfect days</div><div class="stat-val">${stats.perfectDays}</div></div>
+    <div class="stat"><div class="stat-label">Active days</div><div class="stat-val">${stats.daysWithTasks}</div></div>
+  </div>`;
+
+  let viewHtml='';
+
+  // ── CALENDAR ──
+  if(S.view==='cal'){
+    const visibleDOW = ['Mon','Tue','Wed','Thu','Fri'];
+    let cells=visibleDOW.map(d=>`<div class="day-hdr">${d}</div>`).join('');
+    // In 5-col Mon-Fri grid: Mon=0,Tue=1,Wed=2,Thu=3,Fri=4
+    // firstDay: 0=Sun->pad 0, 1=Mon->0, 2=Tue->1, 3=Wed->2, 4=Thu->3, 5=Fri->4, 6=Sat->0
+    const offMap={0:0,1:0,2:1,3:2,4:3,5:4,6:0};
+    const startOffset=offMap[firstDay];
+    for(let i=0;i<startOffset;i++)cells+=`<div class="day-cell empty"></div>`;
+    for(let d=1;d<=totalDays;d++){
+      const dow=new Date(S.year,S.month,d).getDay();
+      if(dow===0||dow===6)continue;
+      const items=tasksForDay(d);
+      const isToday=isCurMon&&d===todayDate;
+      const max=6;
+      const shown=items.slice(0,max);
+      const extra=items.length-max;
+      const doneCount=items.filter(({task,baseDay})=>isChecked(d,task.id,baseDay)).length;
+      const pct=items.length>0?Math.round(doneCount/items.length*100):0;
+      const itemsHtml=shown.map(({task,baseDay,isOverridden})=>{
+        const done=isChecked(d,task.id,baseDay);
+        const col=groupColor(task.groupId);
+        return `<div class="cal-item${isOverridden?' overridden':''}"
+          draggable="true" data-tid="${task.id}" data-bday="${baseDay}" data-fday="${d}"
+          title="${task.name} [${task.owner}]${isOverridden?' — moved this month':''}">
+          <div class="cbar" style="background:${col}"></div>
+          <span class="cname">${task.name}</span>
+          ${isOverridden?'<div class="moved-pip" title="Moved this month"></div>':''}
+          <div class="ccb${done?' on':''}" onclick="event.stopPropagation();toggleCheck(${d},${task.id},${baseDay})">
+            ${done?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':''}
+          </div>
+        </div>`;
+      }).join('');
+      cells+=`<div class="day-cell${isToday?' today':''}" data-day="${d}"
+        ondragover="onDragOver(event,${d})" ondragleave="onDragLeave(event)" ondrop="onDrop(event,${d})">
+        <div class="day-num">${d}</div>
+        <div class="cal-items">${itemsHtml}</div>
+        ${extra>0?`<div class="more-lbl">+${extra} more</div>`:''}
+        ${items.length>0?`<div class="prog-wrap"><div class="prog-fill" style="width:${pct}%"></div></div>`:''}
+      </div>`;
+    }
+    viewHtml=`<div class="drag-hint"><i class="ti ti-drag-drop" style="font-size:12px"></i> Drag a task to reschedule it for this month only (drop target = calendar day)</div><div class="cal-grid" style="grid-template-columns:repeat(5,minmax(0,1fr))">${cells}</div>`;
+  }
+
+  // ── LIST ──
+  if(S.view==='list'){
+    const activeDays=[];
+    for(let d=1;d<=totalDays;d++){
+      if(tasksForDay(d).length>0)activeDays.push(d);
+    }
+    const dayGroups=activeDays.map(d=>{
+      const items=tasksForDay(d);
+      const doneCount=items.filter(({task,baseDay})=>isChecked(d,task.id,baseDay)).length;
+      const allDone=doneCount===items.length;
+      const isToday=isCurMon&&d===todayDate;
+      const dow=DOW[new Date(S.year,S.month,d).getDay()];
+      const collapsed=!!listCollapsed[d];
+      const tasksHtml=items.map(({task,baseDay,isOverridden})=>{
+        const done=isChecked(d,task.id,baseDay);
+        const col=groupColor(task.groupId);
+        const gName=groupName(task.groupId);
+        return `<div class="list-task${done?' done-task':''}"
+          draggable="true"
+          data-tid="${task.id}" data-bday="${baseDay}" data-fday="${d}">
+          <i class="ti ti-grip-vertical list-drag-handle" aria-hidden="true"></i>
+          <div class="list-task-bar" style="background:${col}"></div>
+          <div class="list-task-info" onclick="toggleCheck(${d},${task.id},${baseDay})" style="cursor:pointer">
+            <div class="list-task-name">${task.name}</div>
+            <div class="list-task-meta">
+              <span class="list-task-owner"><i class="ti ti-user" style="font-size:10px"></i>${task.owner}</span>
+              <span>${gName}</span>
+              ${isOverridden?'<span class="list-moved-badge">moved this month</span>':''}
+            </div>
+          </div>
+          <div class="list-task-check${done?' on':''}" onclick="event.stopPropagation();toggleCheck(${d},${task.id},${baseDay})">
+            ${done?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':''}
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="list-day-group${collapsed?' list-day-collapsed':''}" data-day="${d}" ondragover="listDragOver(event,${d})" ondragleave="listDragLeave(event)" ondrop="listDrop(event,${d})">
+        <div class="list-day-hdr" onclick="toggleDayCollapse(${d})">
+          <div class="list-day-title">
+            <span>${dow}, ${MONTHS[S.month]} ${d}${isToday?' <span style="font-size:11px;color:var(--accent);font-weight:400">— Today</span>':''}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="list-day-badge${allDone?' done':''}">${doneCount}/${items.length}</span>
+            <i class="ti ti-chevron-${collapsed?'down':'up'}" style="font-size:13px;color:var(--t3)"></i>
+          </div>
+        </div>
+        <div class="list-tasks">${tasksHtml}</div>
+      </div>`;
+    }).join('');
+    viewHtml=`<div class="drag-hint"><i class="ti ti-drag-drop" style="font-size:12px"></i> Drag a task row to a different day group to reschedule for this month only</div><div class="list-view">${dayGroups||'<div style="font-size:13px;color:var(--t3);padding:1rem 0">No tasks match current filters.</div>'}</div>`;
+  }
+
+  // Panel
+  const groupListHtml=S.groups.map(g=>`<div class="group-card">
+    <div class="group-swatch" style="background:${g.color}"></div>
+    <span class="group-name">${g.name}</span>
+    <span class="group-count">${S.tasks.filter(t=>t.groupId===g.id).length} tasks</span>
+    <button class="group-rm" onclick="removeGroup(${g.id})"><i class="ti ti-trash" style="font-size:12px"></i></button>
+  </div>`).join('');
+
+  const colorOpts=PALETTE.map(p=>`<div class="color-opt${selGroupColor===p.hex?' selected':''}" style="background:${p.hex}" onclick="selectGroupColor('${p.hex}')" title="${p.name}"></div>`).join('');
+
+  const allOwners=[...new Set(S.tasks.map(t=>t.owner))].sort();
+  const groupOpts=S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  const ownerOpts=['Alex','Jean',...allOwners.filter(o=>o!=='Alex'&&o!=='Jean')].map(o=>`<option value="${o}">${o}</option>`).join('');
+
+  const newColor=S.groups.length>0?(S.groups.find(g=>{
+    const el=document.getElementById('nt-group');
+    return el&&g.id===parseInt(el.value);
+  })||S.groups[0]).color:'#888';
+
+  const taskListHtml=S.tasks.length===0
+    ?'<div style="font-size:13px;color:var(--t3)">No tasks yet.</div>'
+    :S.tasks.map(t=>{
+      const col=groupColor(t.groupId);
+      const baseDays=t.weekPattern?['Pattern: '+t.weekPattern]:t.days;
+      const dayLabel=t.weekPattern?`Pattern: ${t.weekPattern}`:t.days.length>0?`Workday ${t.days.join(', ')}`:'No days';
+      const pips=t.weekPattern?'<span style="font-size:11px;color:var(--t3)">Week-based pattern — edit not applicable here</span>':
+        Array.from({length:31},(_,i)=>i+1).map(d=>{
+          const on=t.days.includes(d);
+          return `<button class="dpip${on?' on':''}" style="${on?'background:'+col+';':''}" onclick="toggleTaskDay(${t.id},${d})">${d}</button>`;
+        }).join('');
+      return `<div class="ptask-row">
+        <div class="ptask-top">
+          <div class="ptask-bar" style="background:${col}"></div>
+          <span class="ptask-name">${t.name}</span>
+          <span class="ptask-group">${groupName(t.groupId)}</span>
+          <span class="ptask-owner">${t.owner}</span>
+          <button class="ptask-rm" onclick="removeTask(${t.id})"><i class="ti ti-trash" style="font-size:12px"></i></button>
+        </div>
+        <div class="ptask-days-lbl">${dayLabel}</div>
+        <div class="day-picker">${pips}</div>
+      </div>`;
+    }).join('');
+
+  const newDayPips=Array.from({length:31},(_,i)=>i+1).map(d=>{
+    const on=newTaskDays.includes(d);
+    return `<button class="dpip${on?' on':''}" style="${on?'background:'+newColor+';':''}" onclick="toggleNewDay(${d})">${d}</button>`;
+  }).join('');
+
+  const panelHtml=showPanel?`<div class="panel">
+    <div class="panel-tabs">
+      <button class="ptab${activeTab==='tasks'?' active':''}" onclick="switchTab('tasks')">Tasks</button>
+      <button class="ptab${activeTab==='groups'?' active':''}" onclick="switchTab('groups')">Groups</button>
+    </div>
+    <div class="psection${activeTab==='groups'?' active':''}">
+      <p class="section-hint">Groups share a color. All tasks in a group show that color on the calendar and list.</p>
+      <div class="group-list">${groupListHtml||'<div style="font-size:13px;color:var(--t3)">No groups.</div>'}</div>
+      <div class="add-form">
+        <h3>Add group</h3>
+        <div class="form-row"><input type="text" id="ng-name" placeholder="Group name…" maxlength="40"/></div>
+        <div class="form-lbl">Color</div>
+        <div class="color-options">${colorOpts}</div>
+        <button class="btn" onclick="addGroup()"><i class="ti ti-plus"></i> Add group</button>
+      </div>
+    </div>
+    <div class="psection${activeTab==='tasks'?' active':''}">
+      <p class="section-hint">Tasks are scheduled by workday number (skipping weekends &amp; US federal holidays). Drag on the calendar or list to reschedule for one month only.</p>
+      <div class="ptask-list">${taskListHtml}</div>
+      <div class="add-form">
+        <h3>Add task</h3>
+        <div class="form-row">
+          <input type="text" id="nt-name" placeholder="Task name…" maxlength="80"/>
+        </div>
+        <div class="form-row">
+          <select id="nt-group" onchange="render()">${groupOpts}</select>
+          <select id="nt-owner">${ownerOpts}</select>
+        </div>
+        <div class="form-lbl">Workdays this task repeats (workday 1 = first business day of month):</div>
+        <div class="new-dpick">${newDayPips}</div>
+        <button class="btn" onclick="addTask()"><i class="ti ti-plus"></i> Add task</button>
+      </div>
+    </div>
+  </div>`:'';
+
+  // Unscheduled banner
+  const unscheduled=getUnscheduledTasks();
+  const unscheduledHtml=unscheduled.length>0?`<div class="unscheduled-banner">
+    <div class="unscheduled-title"><i class="ti ti-alert-triangle"></i>${unscheduled.length} task${unscheduled.length>1?'s':''} not scheduled this month — workday falls outside month length</div>
+    <div class="unscheduled-list">
+      ${unscheduled.map(({task,workday})=>`<div class="unscheduled-row">
+        <div class="unscheduled-bar" style="background:${groupColor(task.groupId)}"></div>
+        <div class="unscheduled-info">
+          <div class="unscheduled-name">${task.name}</div>
+          <div class="unscheduled-meta">${task.owner} · ${groupName(task.groupId)} · Workday ${workday}</div>
+        </div>
+        <button class="unscheduled-assign" onclick="openAssignModal(${task.id},${workday})"><i class="ti ti-calendar-plus" style="font-size:12px"></i> Assign day</button>
+      </div>`).join('')}
+    </div>
+  </div>`:'';
+
+  // Assign modal
+  let assignModalHtml='';
+  if(assignModal){
+    const task=S.tasks.find(t=>t.id===assignModal.taskId);
+    const col=task?groupColor(task.groupId):'#888';
+    const totalDays=dim();
+    // Build workday-only day buttons for this month
+    const dayBtns=[];
+    for(let d=1;d<=totalDays;d++){
+      if(!isWorkday(S.year,S.month,d))continue;
+      const wd=calDayToWorkday(S.year,S.month,d);
+      const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(S.year,S.month,d).getDay()];
+      const sel=assignModal.selectedCalDay===d;
+      dayBtns.push(`<button class="wkd-btn${sel?' selected':''}" onclick="selectAssignDay(${d})">${dow} ${d}${wd?' (WD'+wd+')':''}</button>`);
+    }
+    assignModalHtml=`<div class="modal-backdrop" onclick="if(event.target===this)closeAssignModal()">
+      <div class="modal-box">
+        <h3>Assign a day for this month</h3>
+        <p class="modal-sub"><strong>${task?task.name:'Task'}</strong> is normally workday ${assignModal.workday} but this month doesn't have that many workdays. Pick a workday to assign it to for ${MONTHS[S.month]} only.</p>
+        <div class="modal-wkday-pick">${dayBtns.join('')}</div>
+        <div class="modal-actions">
+          <button class="modal-cancel" onclick="closeAssignModal()">Cancel</button>
+          <button class="modal-confirm" onclick="confirmAssign()" ${!assignModal.selectedCalDay?'disabled style="opacity:.5;cursor:default"':''}>Confirm</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  app.innerHTML=`
+    ${assignModalHtml}
+    ${panelHtml}
+    <div class="month-bar">
+      <div class="nav-row" style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-icon" onclick="prevMonth()"><i class="ti ti-chevron-left"></i></button>
+        <span class="month-label">${MONTHS[S.month]} ${S.year}</span>
+        <button class="btn btn-icon" onclick="nextMonth()"><i class="ti ti-chevron-right"></i></button>
+      </div>
+    </div>
+    ${statsHtml}
+    <div class="legend">${legendHtml}</div>
+    <div class="filter-bar">${ownerBtns}${groupBtns}</div>
+    ${unscheduledHtml}
+    ${viewHtml}
+  `;
+
+  document.querySelectorAll('.cal-item').forEach(el=>{
+    el.addEventListener('dragstart',onDragStart);
+    el.addEventListener('dragend',onDragEnd);
+  });
+  document.querySelectorAll('.list-task').forEach(el=>{
+    el.addEventListener('dragstart',listDragStart);
+    el.addEventListener('dragend',listDragEnd);
+  });
+}
+
+// ── LIST DRAG ──
+function listDragStart(e){
+  dragTaskId=parseInt(e.currentTarget.dataset.tid);
+  dragFromDay=parseInt(e.currentTarget.dataset.fday);
+  dragBaseDay=parseInt(e.currentTarget.dataset.bday);
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain','listdrag');
+  setTimeout(()=>e.currentTarget.classList.add('dragging'),0);
+}
+function listDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.list-day-group').forEach(g=>g.classList.remove('list-drag-over'));
+  dragTaskId=null;dragFromDay=null;dragBaseDay=null;
+}
+function listDragOver(e,toDay){
+  e.preventDefault();
+  document.querySelectorAll('.list-day-group').forEach(g=>g.classList.remove('list-drag-over'));
+  if(toDay!==dragFromDay)e.currentTarget.classList.add('list-drag-over');
+  e.dataTransfer.dropEffect='move';
+}
+function listDragLeave(e){
+  if(!e.currentTarget.contains(e.relatedTarget))
+    e.currentTarget.classList.remove('list-drag-over');
+}
+function listDrop(e,toDay){
+  e.preventDefault();
+  document.querySelectorAll('.list-day-group').forEach(g=>g.classList.remove('list-drag-over'));
+  if(!dragTaskId||toDay===dragFromDay)return;
+  if(toDay<1||toDay>dim())return;
+  applyOverride(dragTaskId,dragBaseDay,toDay);
+}
+
+// Expose globals
+['prevMonth','nextMonth','setView','togglePanel','switchTab','openAssignModal','closeAssignModal','selectAssignDay','confirmAssign',
+ 'setFilterOwner','setFilterGroup','toggleCheck','toggleTaskDay',
+ 'toggleNewDay','addTask','addGroup','removeTask','removeGroup',
+ 'selectGroupColor','onDragOver','onDragLeave','onDrop','toggleDayCollapse',
+ 'listDragOver','listDragLeave','listDrop'
+].forEach(fn=>window[fn]=eval(fn));
+
+// Register service worker
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+render();
+</script>
+</body>
+</html>
