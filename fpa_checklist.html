@@ -86,6 +86,8 @@ body{display:flex;flex-direction:column;}
 .sop-link:hover{color:var(--accent);}
 .list-sop{font-size:11px;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:2px;}
 .list-sop:hover{text-decoration:underline;}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1a1a18;color:#fff;font-size:13px;padding:10px 16px;border-radius:var(--r1);box-shadow:0 4px 16px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:300;max-width:90vw;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
 /* ── LIST VIEW ── */
 .list-view{display:flex;flex-direction:column;gap:6px;}
@@ -243,15 +245,66 @@ function esc(s){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-// Add https:// if the user pasted a link without it
+// Network-drive paths like \\server\share\file.mp4, S:\folder\file, or file:// links
+function isNetworkPath(u){return /^(\\\\|[a-zA-Z]:\\|file:)/i.test(u||'');}
+// Tidy a pasted SOP location (strips quotes from Windows "Copy as path", undoes an old https:// prefix bug)
+function cleanSop(u){
+  u=(u||'').trim().replace(/^"(.*)"$/,'$1').trim();
+  u=u.replace(/^https?:\/\/(?=\\\\|[a-zA-Z]:\\)/i,'');
+  return u;
+}
+// Add https:// if the user pasted a web link without it; leave network paths alone
 function normalizeUrl(u){
-  u=(u||'').trim();
+  u=cleanSop(u);
   if(!u)return '';
+  if(isNetworkPath(u))return u;
   if(!/^https?:\/\//i.test(u))u='https://'+u;
   return u;
 }
-// Only allow http/https links to be rendered
+// Only allow http/https links to be rendered as clickable links
 function safeUrl(u){return /^https?:\/\//i.test(u||'')?u:'';}
+
+// SOP link markup. Web links open in a new tab. Network paths can't be opened by
+// browsers (security rule), so they copy the path for pasting into File Explorer.
+function sopLink(u,variant){
+  u=cleanSop(u);
+  if(!u)return '';
+  const cls=variant==='list'?'list-sop':'sop-link';
+  const style=variant==='panel'?' style="font-size:11px"':'';
+  const iconSize=variant==='panel'?12:11;
+  if(safeUrl(u)){
+    return `<a class="${cls}"${style} href="${esc(u)}" target="_blank" rel="noopener" draggable="false" title="Open SOP" onclick="event.stopPropagation()"><i class="ti ti-file-text" style="font-size:${iconSize}px"></i>${variant==='cal'?'':'SOP'}</a>`;
+  }
+  if(isNetworkPath(u)){
+    return `<a class="${cls}"${style} href="#" role="button" draggable="false" data-p="${esc(u)}" title="SOP is on the network drive — click to copy the path, then paste it into File Explorer" onclick="event.preventDefault();event.stopPropagation();copySopPath(this.dataset.p)"><i class="ti ti-folder" style="font-size:${iconSize}px"></i>${variant==='cal'?'':'SOP (copy path)'}</a>`;
+  }
+  return '';
+}
+
+async function copySopPath(p){
+  let ok=false;
+  try{ await navigator.clipboard.writeText(p); ok=true; }catch(e){}
+  if(!ok){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=p; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      ok=document.execCommand('copy'); ta.remove();
+    }catch(e){}
+  }
+  showToast(ok
+    ? 'SOP path copied. Press Windows key + R, then Ctrl+V, then Enter to open it (must be on the network/VPN).'
+    : 'Copy this path into File Explorer: '+p);
+}
+
+function showToast(msg){
+  let t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(showToast._h);
+  showToast._h=setTimeout(()=>t.classList.remove('show'),7000);
+}
 
 // ── WORKDAY ENGINE ──
 function getFederalHolidays(year) {
@@ -511,7 +564,7 @@ function taskToRow(t){
 function rowToTask(r){
   const t={id:r.id,groupId:r.group_id,owner:r.owner,name:r.name,days:(r.days||[]).map(Number)};
   if(r.week_pattern)t.weekPattern=r.week_pattern;
-  if(r.sop_url)t.sopUrl=r.sop_url;
+  if(r.sop_url)t.sopUrl=cleanSop(r.sop_url);
   return t;
 }
 
@@ -913,7 +966,7 @@ async function addTask(){
 function startEditTask(id){
   const t=S.tasks.find(x=>x.id===id);
   if(!t)return;
-  editTask={id:t.id,name:t.name,groupId:t.groupId,owner:t.owner,sopUrl:t.sopUrl||''};
+  editTask={id:t.id,name:t.name,groupId:t.groupId,owner:t.owner,sopUrl:cleanSop(t.sopUrl)};
   render();
 }
 function setEditField(field,value){
@@ -1072,14 +1125,13 @@ function render(){
       const itemsHtml=shown.map(({task,baseDay,isOverridden})=>{
         const done=isChecked(d,task.id,baseDay);
         const col=groupColor(task.groupId);
-        const sop=safeUrl(task.sopUrl);
         return `<div class="cal-item${isOverridden?' overridden':''}"
           draggable="true" data-tid="${task.id}" data-bday="${baseDay}" data-fday="${d}"
           title="${esc(task.name)} [${esc(task.owner)}]${isOverridden?' — moved this month':''}">
           <div class="cbar" style="background:${col}"></div>
           <span class="cname">${esc(task.name)}</span>
           ${isOverridden?'<div class="moved-pip" title="Moved this month"></div>':''}
-          ${sop?`<a class="sop-link" href="${esc(sop)}" target="_blank" rel="noopener" draggable="false" title="Open SOP" onclick="event.stopPropagation()"><i class="ti ti-file-text" style="font-size:11px"></i></a>`:''}
+          ${sopLink(task.sopUrl,'cal')}
           <div class="ccb${done?' on':''}" onclick="event.stopPropagation();toggleCheck(${d},${task.id},${baseDay})">
             ${done?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':''}
           </div>
@@ -1113,7 +1165,6 @@ function render(){
         const done=isChecked(d,task.id,baseDay);
         const col=groupColor(task.groupId);
         const gName=groupName(task.groupId);
-        const sop=safeUrl(task.sopUrl);
         return `<div class="list-task${done?' done-task':''}"
           draggable="true"
           data-tid="${task.id}" data-bday="${baseDay}" data-fday="${d}">
@@ -1124,7 +1175,7 @@ function render(){
             <div class="list-task-meta">
               <span class="list-task-owner"><i class="ti ti-user" style="font-size:10px"></i>${esc(task.owner)}</span>
               <span>${esc(gName)}</span>
-              ${sop?`<a class="list-sop" href="${esc(sop)}" target="_blank" rel="noopener" draggable="false" onclick="event.stopPropagation()"><i class="ti ti-file-text" style="font-size:11px"></i>SOP</a>`:''}
+              ${sopLink(task.sopUrl,'list')}
               ${isOverridden?'<span class="list-moved-badge">moved this month</span>':''}
             </div>
           </div>
@@ -1180,7 +1231,6 @@ function render(){
     :S.tasks.map(t=>{
       const col=groupColor(t.groupId);
       const isEditing=editTask&&editTask.id===t.id;
-      const sop=safeUrl(t.sopUrl);
       const dayLabel=t.weekPattern?`Pattern: ${t.weekPattern}`:t.days.length>0?`Workday ${t.days.join(', ')}`:'No days';
       const pips=t.weekPattern?'<span style="font-size:11px;color:var(--t3)">Week-based pattern — edit not applicable here</span>':
         Array.from({length:31},(_,i)=>i+1).map(d=>{
@@ -1198,7 +1248,7 @@ function render(){
             <select id="et-owner" onchange="setEditField('owner',this.value)">${ownerOptsFor(editTask.owner)}</select>
           </div>
           <div class="form-row">
-            <input type="url" id="et-sop" value="${esc(editTask.sopUrl)}" placeholder="SOP link (optional) — paste a SharePoint, OneDrive or Google Drive URL" oninput="setEditField('sopUrl',this.value)"/>
+            <input type="text" id="et-sop" value="${esc(editTask.sopUrl)}" placeholder="SOP link (optional) — SharePoint/OneDrive URL or network path like \\server\folder\file" oninput="setEditField('sopUrl',this.value)"/>
           </div>
           <div class="form-row">
             <button class="btn active" onclick="saveEditTask()"><i class="ti ti-check"></i> Save</button>
@@ -1209,7 +1259,7 @@ function render(){
         <div class="ptask-top">
           <div class="ptask-bar" style="background:${col}"></div>
           <span class="ptask-name">${esc(t.name)}</span>
-          ${sop?`<a class="sop-link" href="${esc(sop)}" target="_blank" rel="noopener" title="Open SOP" style="font-size:11px"><i class="ti ti-file-text" style="font-size:12px"></i>SOP</a>`:''}
+          ${sopLink(t.sopUrl,'panel')}
           <span class="ptask-group">${esc(groupName(t.groupId))}</span>
           <span class="ptask-owner">${esc(t.owner)}</span>
           <button class="ptask-edit-btn" onclick="${isEditing?'cancelEditTask()':`startEditTask(${t.id})`}" title="Edit name, group, owner or SOP link"><i class="ti ti-pencil" style="font-size:12px"></i></button>
@@ -1267,7 +1317,7 @@ function render(){
           <select id="nt-owner" onchange="setNewTaskField('owner',this.value)">${ownerOptsFor(newTask.owner)}</select>
         </div>
         <div class="form-row">
-          <input type="url" id="nt-sop" placeholder="SOP link (optional) — paste a SharePoint, OneDrive or Google Drive URL" value="${esc(newTask.sopUrl)}" oninput="setNewTaskField('sopUrl',this.value)"/>
+          <input type="text" id="nt-sop" placeholder="SOP link (optional) — SharePoint/OneDrive URL or network path like \\server\folder\file" value="${esc(newTask.sopUrl)}" oninput="setNewTaskField('sopUrl',this.value)"/>
         </div>
         <div class="form-lbl">Workdays this task repeats (workday 1 = first business day of month):</div>
         <div class="new-dpick">${newDayPips}</div>
@@ -1386,7 +1436,7 @@ function listDrop(e,toDay){
  'selectGroupColor','onDragOver','onDragLeave','onDrop','toggleDayCollapse',
  'listDragOver','listDragLeave','listDrop',
  'startEditTask','setEditField','cancelEditTask','saveEditTask','setNewTaskField',
- 'addOwner','removeOwner'
+ 'addOwner','removeOwner','copySopPath'
 ].forEach(fn=>window[fn]=eval(fn));
 
 window.addEventListener('load', ()=>{ render(); initDB(); });
