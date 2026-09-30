@@ -514,7 +514,8 @@ async function loadOverrides(){
 }
 
 async function saveCheck(year,month,day,taskId,baseDay,checked){
-  await sbFetch('checks', {
+  // on_conflict tells Supabase which columns identify an existing row, so un-checking updates it instead of failing as a duplicate
+  await sbFetch('checks?on_conflict=year,month,day,task_id,base_day', {
     method:'POST',
     prefer:'resolution=merge-duplicates',
     headers:{'Prefer':'resolution=merge-duplicates'},
@@ -526,7 +527,7 @@ async function saveOverride(year,month,taskId,baseDay,toDay){
   if(toDay===null){
     await sbFetch(`overrides?year=eq.${year}&month=eq.${month}&task_id=eq.${taskId}&base_day=eq.${baseDay}`,{method:'DELETE'});
   } else {
-    await sbFetch('overrides',{
+    await sbFetch('overrides?on_conflict=year,month,task_id,base_day',{
       method:'POST',
       headers:{'Prefer':'resolution=merge-duplicates'},
       body: JSON.stringify({year,month,task_id:taskId,base_day:baseDay,to_day:toDay,updated_at:new Date().toISOString()})
