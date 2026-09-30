@@ -81,6 +81,12 @@ body{display:flex;flex-direction:column;}
 .prog-fill{height:100%;background:#1D9E75;border-radius:2px;}
 .more-lbl{font-size:9px;color:var(--t3);margin-top:2px;}
 
+/* SOP links */
+.sop-link{color:var(--t3);display:inline-flex;align-items:center;gap:2px;text-decoration:none;flex-shrink:0;cursor:pointer;}
+.sop-link:hover{color:var(--accent);}
+.list-sop{font-size:11px;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:2px;}
+.list-sop:hover{text-decoration:underline;}
+
 /* ── LIST VIEW ── */
 .list-view{display:flex;flex-direction:column;gap:6px;}
 .list-day-group{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r2);overflow:hidden;}
@@ -138,17 +144,22 @@ body{display:flex;flex-direction:column;}
 .color-options{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
 .color-opt{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
 .color-opt.selected{border-color:var(--t1);}
+.owner-avatar{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 
 /* Task rows in panel */
 .ptask-list{display:flex;flex-direction:column;gap:6px;margin-bottom:1rem;}
 .ptask-row{background:var(--bg2);border:0.5px solid var(--b1);border-radius:var(--r1);padding:8px 12px;}
+.ptask-row.editing{border-color:var(--accent);}
 .ptask-top{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
 .ptask-bar{width:3px;height:16px;border-radius:2px;flex-shrink:0;}
 .ptask-name{font-size:13px;font-weight:500;color:var(--t1);flex:1;}
 .ptask-group{font-size:11px;color:var(--t3);margin-right:6px;}
 .ptask-owner{font-size:11px;color:var(--t3);}
-.ptask-rm{background:none;border:none;cursor:pointer;color:var(--t3);padding:0;}
+.ptask-rm,.ptask-edit-btn{background:none;border:none;cursor:pointer;color:var(--t3);padding:0;}
 .ptask-rm:hover{color:#e24b4a;}
+.ptask-edit-btn:hover{color:var(--accent);}
+.ptask-edit{background:var(--bg1);border:0.5px solid var(--b1);border-radius:var(--r1);padding:10px;margin:4px 0 8px;}
+.ptask-edit .form-row:last-child{margin-bottom:0;}
 .ptask-days-lbl{font-size:11px;color:var(--t3);margin-bottom:5px;}
 .day-picker{display:flex;flex-wrap:wrap;gap:3px;}
 .dpip{width:24px;height:24px;border-radius:50%;border:0.5px solid var(--b2);background:transparent;cursor:pointer;font-size:10px;color:var(--t2);display:flex;align-items:center;justify-content:center;}
@@ -161,6 +172,7 @@ body{display:flex;flex-direction:column;}
 .form-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
 .form-row input,.form-row select{font-size:13px;padding:6px 10px;border:0.5px solid var(--b2);border-radius:var(--r1);background:var(--bg3);color:var(--t1);}
 .form-row input{flex:1;min-width:140px;}
+.form-row .inline-lbl{font-size:12px;color:var(--t3);}
 .form-lbl{font-size:12px;color:var(--t3);margin-bottom:5px;}
 .new-dpick{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;}
 
@@ -222,6 +234,24 @@ const PALETTE=[
 ];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DEFAULT_OWNERS=['Alex','Jean','Sarah'];
+
+// ── HELPERS ──
+// Escape text before inserting into HTML
+function esc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Add https:// if the user pasted a link without it
+function normalizeUrl(u){
+  u=(u||'').trim();
+  if(!u)return '';
+  if(!/^https?:\/\//i.test(u))u='https://'+u;
+  return u;
+}
+// Only allow http/https links to be rendered
+function safeUrl(u){return /^https?:\/\//i.test(u||'')?u:'';}
 
 // ── WORKDAY ENGINE ──
 function getFederalHolidays(year) {
@@ -314,6 +344,7 @@ function defaultState(){
     year:new Date().getFullYear(),
     month:new Date().getMonth(),
     view:'cal',
+    owners:[...DEFAULT_OWNERS],
     groups:[
       {id:1,name:'ME Close',color:'#378ADD'},
       {id:2,name:'Reporting',color:'#1D9E75'},
@@ -384,19 +415,21 @@ function defaultState(){
 }
 
 // ── SUPABASE CONFIG ──
-const SUPABASE_URL = 'https://gliumoolufkpkeqmdqot.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_n885tsn-jbAuZcYgCIz2iA_O4xswqmW';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
 
 async function sbFetch(path, opts={}){
+  // Pull headers out of opts so they're merged with (not replacing) the API key headers
+  const {headers:extraHeaders, prefer, ...rest} = opts;
   const res = await fetch(SUPABASE_URL+'/rest/v1/'+path, {
+    ...rest,
     headers: {
       'apikey': SUPABASE_KEY,
       'Authorization': 'Bearer '+SUPABASE_KEY,
       'Content-Type': 'application/json',
-      'Prefer': opts.prefer||'',
-      ...opts.headers
-    },
-    ...opts
+      'Prefer': prefer||'',
+      ...(extraHeaders||{})
+    }
   });
   if(!res.ok){ const t=await res.text(); console.error('Supabase error:',t); return null; }
   const txt = await res.text();
@@ -448,6 +481,101 @@ async function saveOverride(year,month,taskId,baseDay,toDay){
   }
 }
 
+// ── SHARED CONFIG (tasks, groups, team) ──
+// Like sbFetch but reports success/failure so we can retry or warn
+async function sbWrite(path, opts={}){
+  try{
+    const {headers:extraHeaders, ...rest} = opts;
+    const res = await fetch(SUPABASE_URL+'/rest/v1/'+path, {
+      ...rest,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer '+SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        ...(extraHeaders||{})
+      }
+    });
+    if(!res.ok){ const t=await res.text(); console.error('Supabase error:',t); }
+    return {ok:res.ok,status:res.status};
+  }catch(e){
+    console.error('Supabase network error:',e);
+    return {ok:false,status:0};
+  }
+}
+const UPSERT={'Prefer':'resolution=merge-duplicates'};
+
+function taskToRow(t){
+  return {id:t.id,group_id:t.groupId,owner:t.owner,name:t.name,days:t.days||[],
+    week_pattern:t.weekPattern||null,sop_url:t.sopUrl||null,updated_at:new Date().toISOString()};
+}
+function rowToTask(r){
+  const t={id:r.id,groupId:r.group_id,owner:r.owner,name:r.name,days:(r.days||[]).map(Number)};
+  if(r.week_pattern)t.weekPattern=r.week_pattern;
+  if(r.sop_url)t.sopUrl=r.sop_url;
+  return t;
+}
+
+// Returns {tasks,groups,owners} or null if the tables can't be read
+async function loadSharedConfig(){
+  const [tRows,gRows,mRows]=await Promise.all([
+    sbFetch('tasks?select=*&order=id'),
+    sbFetch('task_groups?select=*&order=id'),
+    sbFetch('team_members?select=*&order=created_at,name')
+  ]);
+  if(!Array.isArray(tRows)||!Array.isArray(gRows)||!Array.isArray(mRows))return null;
+  return {
+    tasks:tRows.map(rowToTask),
+    groups:gRows.map(r=>({id:r.id,name:r.name,color:r.color})),
+    owners:mRows.map(r=>r.name)
+  };
+}
+
+// One-time upload of this browser's tasks/groups/team when the shared tables are empty
+async function seedSharedConfig(){
+  const r1=await sbWrite('task_groups',{method:'POST',headers:UPSERT,
+    body:JSON.stringify(S.groups.map(g=>({id:g.id,name:g.name,color:g.color})))});
+  const r2=await sbWrite('team_members',{method:'POST',headers:UPSERT,
+    body:JSON.stringify(S.owners.map(n=>({name:n})))});
+  const r3=await sbWrite('tasks',{method:'POST',headers:UPSERT,
+    body:JSON.stringify(S.tasks.map(taskToRow))});
+  return r1.ok&&r2.ok&&r3.ok;
+}
+
+function dbNotice(res){
+  const el=document.getElementById('save-notice');
+  if(!el)return;
+  if(res&&res.ok)el.textContent='Saved for everyone · '+new Date().toLocaleTimeString();
+  else el.textContent='⚠ Could not save to the shared database — check your connection and try again';
+}
+
+async function dbSaveTask(t){ dbNotice(await sbWrite('tasks',{method:'POST',headers:UPSERT,body:JSON.stringify(taskToRow(t))})); }
+async function dbDeleteTask(id){
+  // Also clear that task's checkmarks/moves so a future task can't inherit them
+  const r=await sbWrite(`tasks?id=eq.${id}`,{method:'DELETE'});
+  await sbWrite(`checks?task_id=eq.${id}`,{method:'DELETE'});
+  await sbWrite(`overrides?task_id=eq.${id}`,{method:'DELETE'});
+  dbNotice(r);
+}
+async function dbSaveGroup(g){ dbNotice(await sbWrite('task_groups',{method:'POST',headers:UPSERT,body:JSON.stringify({id:g.id,name:g.name,color:g.color})})); }
+async function dbDeleteGroup(id,taskIds){
+  for(const tid of taskIds) await dbDeleteTask(tid);
+  dbNotice(await sbWrite(`task_groups?id=eq.${id}`,{method:'DELETE'}));
+}
+async function dbSaveMember(name){ dbNotice(await sbWrite('team_members',{method:'POST',headers:UPSERT,body:JSON.stringify({name})})); }
+async function dbDeleteMember(name){ dbNotice(await sbWrite(`team_members?name=eq.${encodeURIComponent(name)}`,{method:'DELETE'})); }
+
+// Insert a new row with the next free id; retries if someone else took that id at the same moment
+async function dbInsertWithNewId(table,makeRow,localIds){
+  let top=await sbFetch(`${table}?select=id&order=id.desc&limit=1`);
+  let id=Math.max(0,...localIds,(Array.isArray(top)&&top.length)?top[0].id:0)+1;
+  for(let attempt=0;attempt<5;attempt++,id++){
+    const res=await sbWrite(table,{method:'POST',body:JSON.stringify(makeRow(id))});
+    if(res.ok)return id;
+    if(res.status!==409)return null;
+  }
+  return null;
+}
+
 function loadLocalPrefs(){
   try{
     const s=localStorage.getItem('fpa_prefs');
@@ -460,6 +588,7 @@ function saveLocalPrefs(){
   try{
     localStorage.setItem('fpa_prefs', JSON.stringify({
       year:S.year, month:S.month, view:S.view,
+      owners:S.owners,
       groups:S.groups, tasks:S.tasks,
       nextGroupId:S.nextGroupId, nextTaskId:S.nextTaskId
     }));
@@ -469,11 +598,13 @@ function saveLocalPrefs(){
 function loadState(){
   const prefs = loadLocalPrefs();
   const base = defaultState();
-  return {
+  const st = {
     ...base,
     year: prefs.year||base.year,
-    month: prefs.month||base.month,
+    // month can be 0 (January), so check for null instead of falsy
+    month: (prefs.month!==undefined&&prefs.month!==null)?prefs.month:base.month,
     view: prefs.view||base.view,
+    owners: Array.isArray(prefs.owners)?prefs.owners:base.owners,
     groups: prefs.groups||base.groups,
     tasks: prefs.tasks||base.tasks,
     nextGroupId: prefs.nextGroupId||base.nextGroupId,
@@ -481,10 +612,35 @@ function loadState(){
     checks:{},
     overrides:{}
   };
+  // Make sure anyone who already owns a task is in the owner list
+  st.tasks.forEach(t=>{ if(t.owner&&!st.owners.includes(t.owner)) st.owners.push(t.owner); });
+  return st;
 }
 
 let S=loadState();
 let dbLoaded=false;
+let sharedConfigOk=false;
+
+// Pull tasks, groups and team from Supabase into S (returns false if unavailable)
+async function syncSharedConfig(){
+  let cfg=await loadSharedConfig();
+  if(!cfg)return false;
+  if(cfg.tasks.length===0&&cfg.groups.length===0&&cfg.owners.length===0){
+    // Shared tables are brand new — upload this browser's list as the starting point
+    const ok=await seedSharedConfig();
+    if(!ok)return false;
+    cfg=await loadSharedConfig();
+    if(!cfg)return false;
+  }
+  S.tasks=cfg.tasks;
+  S.groups=cfg.groups;
+  S.owners=cfg.owners;
+  // Anyone who owns a task should be selectable
+  S.tasks.forEach(t=>{ if(t.owner&&!S.owners.includes(t.owner)) S.owners.push(t.owner); });
+  if(editTask&&!S.tasks.some(t=>t.id===editTask.id))editTask=null;
+  saveLocalPrefs(); // keep a local copy as an offline fallback
+  return true;
+}
 
 async function initDB(){
   const notice = document.getElementById('save-notice');
@@ -492,12 +648,33 @@ async function initDB(){
   try {
     S.checks = await loadChecks();
     S.overrides = await loadOverrides();
+    sharedConfigOk = await syncSharedConfig();
     dbLoaded=true;
-    if(notice) notice.textContent='Synced · '+new Date().toLocaleTimeString();
+    if(notice) notice.textContent = sharedConfigOk
+      ? 'Synced · '+new Date().toLocaleTimeString()
+      : '⚠ Shared task list not available — showing this browser\'s copy (run the Supabase setup script)';
   } catch(e){
     if(notice) notice.textContent='Offline — using local data';
   }
   render();
+}
+
+// Re-pull everyone's changes when you come back to the tab, and once a minute
+let refreshing=false;
+async function refreshFromDB(){
+  if(!dbLoaded||refreshing||dragTaskId)return;
+  const a=document.activeElement;
+  if(a&&(a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'))return; // don't interrupt typing
+  refreshing=true;
+  try{
+    const [c,o]=await Promise.all([loadChecks(),loadOverrides()]);
+    S.checks=c; S.overrides=o;
+    if(sharedConfigOk) await syncSharedConfig();
+    const notice=document.getElementById('save-notice');
+    if(notice) notice.textContent='Synced · '+new Date().toLocaleTimeString();
+    render();
+  }catch(e){}
+  refreshing=false;
 }
 let showPanel=false;
 let activeTab='tasks';
@@ -506,6 +683,11 @@ let selGroupColor=PALETTE[0].hex;
 let filterOwner='all';
 let filterGroup='all';
 let listCollapsed={};
+
+// Draft values for forms (kept in memory so typing isn't lost when the page re-renders)
+let newTask={name:'',groupId:null,owner:null,sopUrl:''};
+let editTask=null; // {id,name,groupId,owner,sopUrl} while a task is being edited
+let newOwnerName='';
 
 // drag
 let dragTaskId=null,dragFromDay=null,dragBaseDay=null;
@@ -675,39 +857,134 @@ function toggleTaskDay(taskId,day){
   else t.days.push(day);
   t.days.sort((a,b)=>a-b);
   save();render();
+  dbSaveTask(t);
 }
 function toggleNewDay(day){
   if(newTaskDays.includes(day))newTaskDays=newTaskDays.filter(d=>d!==day);
   else newTaskDays.push(day);
   render();
 }
-function removeTask(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();render();}
-function addTask(){
-  const ne=document.getElementById('nt-name');
-  const ge=document.getElementById('nt-group');
-  const oe=document.getElementById('nt-owner');
-  const name=(ne.value||'').trim();
-  if(!name){ne.focus();return;}
-  if(!ge.value){alert('Select a group.');return;}
-  if(newTaskDays.length===0){alert('Select at least one day.');return;}
-  S.tasks.push({id:S.nextTaskId++,groupId:parseInt(ge.value),owner:oe.value,name,days:[...newTaskDays].sort((a,b)=>a-b)});
-  newTaskDays=[];
-  save();render();
+function removeTask(id){
+  const t=S.tasks.find(x=>x.id===id);
+  if(!t)return;
+  if(!confirm(`Delete "${t.name}" for everyone?`))return;
+  if(editTask&&editTask.id===id)editTask=null;
+  S.tasks=S.tasks.filter(x=>x.id!==id);save();render();
+  dbDeleteTask(id);
 }
-function addGroup(){
+
+// Fill in defaults for the add-task form if its group/owner no longer exist
+function syncNewTaskDefaults(){
+  if(!S.groups.some(g=>g.id===newTask.groupId))newTask.groupId=S.groups.length?S.groups[0].id:null;
+  if(!S.owners.includes(newTask.owner))newTask.owner=S.owners.length?S.owners[0]:null;
+}
+function setNewTaskField(field,value){
+  newTask[field]=field==='groupId'?parseInt(value):value;
+  if(field==='groupId')render(); // refresh day-pip color
+}
+let addingTask=false;
+async function addTask(){
+  if(addingTask)return;
+  syncNewTaskDefaults();
+  const name=(newTask.name||'').trim();
+  if(!name){const ne=document.getElementById('nt-name');if(ne)ne.focus();return;}
+  if(!newTask.groupId){alert('Select a group.');return;}
+  if(!newTask.owner){alert('Add a team member first (Team tab).');return;}
+  if(newTaskDays.length===0){alert('Select at least one day.');return;}
+  const task={id:0,groupId:newTask.groupId,owner:newTask.owner,name,days:[...newTaskDays].sort((a,b)=>a-b)};
+  const sop=normalizeUrl(newTask.sopUrl);
+  if(sop)task.sopUrl=sop;
+  addingTask=true;
+  const notice=document.getElementById('save-notice');
+  if(notice)notice.textContent='Adding task…';
+  const id=await dbInsertWithNewId('tasks',nid=>taskToRow({...task,id:nid}),S.tasks.map(t=>t.id).concat(S.nextTaskId-1));
+  addingTask=false;
+  if(!id){dbNotice({ok:false});return;} // keep the form filled so they can retry
+  task.id=id;
+  S.nextTaskId=Math.max(S.nextTaskId,id+1);
+  S.tasks.push(task);
+  newTaskDays=[];
+  newTask.name='';newTask.sopUrl='';
+  save();render();
+  dbNotice({ok:true});
+}
+
+// ── EDIT TASK (name, group, owner, SOP link) ──
+function startEditTask(id){
+  const t=S.tasks.find(x=>x.id===id);
+  if(!t)return;
+  editTask={id:t.id,name:t.name,groupId:t.groupId,owner:t.owner,sopUrl:t.sopUrl||''};
+  render();
+}
+function setEditField(field,value){
+  if(!editTask)return;
+  editTask[field]=field==='groupId'?parseInt(value):value;
+}
+function cancelEditTask(){editTask=null;render();}
+function saveEditTask(){
+  if(!editTask)return;
+  const t=S.tasks.find(x=>x.id===editTask.id);
+  if(!t){editTask=null;render();return;}
+  const name=(editTask.name||'').trim();
+  if(!name){alert('Task name can\'t be blank.');return;}
+  t.name=name;
+  t.groupId=editTask.groupId;
+  t.owner=editTask.owner;
+  const sop=normalizeUrl(editTask.sopUrl);
+  if(sop)t.sopUrl=sop; else delete t.sopUrl;
+  editTask=null;
+  save();render();
+  dbSaveTask(t);
+}
+
+// ── TEAM MEMBERS ──
+function addOwner(){
+  const name=(newOwnerName||'').trim();
+  if(!name){const el=document.getElementById('no-name');if(el)el.focus();return;}
+  if(S.owners.some(o=>o.toLowerCase()===name.toLowerCase())){alert(name+' is already on the team.');return;}
+  S.owners.push(name);
+  newOwnerName='';
+  save();render();
+  dbSaveMember(name);
+}
+function removeOwner(name){
+  const count=S.tasks.filter(t=>t.owner===name).length;
+  if(count>0){
+    alert(`${name} still owns ${count} task${count>1?'s':''}. Reassign them first (Tasks tab → pencil icon).`);
+    return;
+  }
+  S.owners=S.owners.filter(o=>o!==name);
+  if(filterOwner===name)filterOwner='all';
+  save();render();
+  dbDeleteMember(name);
+}
+
+let addingGroup=false;
+async function addGroup(){
+  if(addingGroup)return;
   const ne=document.getElementById('ng-name');
   const name=(ne.value||'').trim();
   if(!name){ne.focus();return;}
-  S.groups.push({id:S.nextGroupId++,name,color:selGroupColor});
+  if(S.groups.some(g=>g.name.toLowerCase()===name.toLowerCase())){alert('That group already exists.');return;}
+  const color=selGroupColor;
+  addingGroup=true;
+  const id=await dbInsertWithNewId('task_groups',nid=>({id:nid,name,color}),S.groups.map(g=>g.id).concat(S.nextGroupId-1));
+  addingGroup=false;
+  if(!id){dbNotice({ok:false});return;}
+  S.nextGroupId=Math.max(S.nextGroupId,id+1);
+  S.groups.push({id,name,color});
   save();render();
+  dbNotice({ok:true});
 }
 function removeGroup(id){
-  if(S.tasks.some(t=>t.groupId===id)){
-    if(!confirm('Remove group and all its tasks?'))return;
+  const taskIds=S.tasks.filter(t=>t.groupId===id).map(t=>t.id);
+  if(taskIds.length){
+    if(!confirm(`Remove this group and its ${taskIds.length} task${taskIds.length>1?'s':''} for everyone?`))return;
     S.tasks=S.tasks.filter(t=>t.groupId!==id);
   }
   S.groups=S.groups.filter(g=>g.id!==id);
   save();render();
+  dbDeleteGroup(id,taskIds);
 }
 function selectGroupColor(hex){selGroupColor=hex;render();}
 
@@ -749,18 +1026,19 @@ function render(){
   const totalDays=dim();
   const firstDay=fdow();
   const stats=monthStats();
+  syncNewTaskDefaults();
 
   // Update view toggle buttons
   document.getElementById('btn-cal').classList.toggle('active',S.view==='cal');
   document.getElementById('btn-list').classList.toggle('active',S.view==='list');
 
   // Legend
-  const legendHtml=S.groups.map(g=>`<div class="legend-chip"><div class="legend-dot" style="background:${g.color}"></div>${g.name}</div>`).join('');
+  const legendHtml=S.groups.map(g=>`<div class="legend-chip"><div class="legend-dot" style="background:${g.color}"></div>${esc(g.name)}</div>`).join('');
 
   // Filter bar
-  const owners=[...new Set(S.tasks.map(t=>t.owner))].sort();
-  const ownerBtns=['all',...owners].map(o=>`<button class="filter-btn${filterOwner===o?' active':''}" onclick="setFilterOwner('${o}')">${o==='all'?'All owners':o}</button>`).join('');
-  const groupBtns=['all',...S.groups.map(g=>g.id)].map(v=>`<button class="filter-btn${filterGroup===(v==='all'?'all':v.toString())?' active':''}" onclick="setFilterGroup('${v}')">${v==='all'?'All groups':groupName(v)}</button>`).join('');
+  const owners=[...S.owners];
+  const ownerBtns=['all',...owners].map(o=>`<button class="filter-btn${filterOwner===o?' active':''}" data-o="${esc(o)}" onclick="setFilterOwner(this.dataset.o)">${o==='all'?'All owners':esc(o)}</button>`).join('');
+  const groupBtns=['all',...S.groups.map(g=>g.id)].map(v=>`<button class="filter-btn${filterGroup===(v==='all'?'all':v.toString())?' active':''}" onclick="setFilterGroup('${v}')">${v==='all'?'All groups':esc(groupName(v))}</button>`).join('');
 
   // Stats
   const statsHtml=`<div class="stats">
@@ -794,12 +1072,14 @@ function render(){
       const itemsHtml=shown.map(({task,baseDay,isOverridden})=>{
         const done=isChecked(d,task.id,baseDay);
         const col=groupColor(task.groupId);
+        const sop=safeUrl(task.sopUrl);
         return `<div class="cal-item${isOverridden?' overridden':''}"
           draggable="true" data-tid="${task.id}" data-bday="${baseDay}" data-fday="${d}"
-          title="${task.name} [${task.owner}]${isOverridden?' — moved this month':''}">
+          title="${esc(task.name)} [${esc(task.owner)}]${isOverridden?' — moved this month':''}">
           <div class="cbar" style="background:${col}"></div>
-          <span class="cname">${task.name}</span>
+          <span class="cname">${esc(task.name)}</span>
           ${isOverridden?'<div class="moved-pip" title="Moved this month"></div>':''}
+          ${sop?`<a class="sop-link" href="${esc(sop)}" target="_blank" rel="noopener" draggable="false" title="Open SOP" onclick="event.stopPropagation()"><i class="ti ti-file-text" style="font-size:11px"></i></a>`:''}
           <div class="ccb${done?' on':''}" onclick="event.stopPropagation();toggleCheck(${d},${task.id},${baseDay})">
             ${done?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':''}
           </div>
@@ -833,16 +1113,18 @@ function render(){
         const done=isChecked(d,task.id,baseDay);
         const col=groupColor(task.groupId);
         const gName=groupName(task.groupId);
+        const sop=safeUrl(task.sopUrl);
         return `<div class="list-task${done?' done-task':''}"
           draggable="true"
           data-tid="${task.id}" data-bday="${baseDay}" data-fday="${d}">
           <i class="ti ti-grip-vertical list-drag-handle" aria-hidden="true"></i>
           <div class="list-task-bar" style="background:${col}"></div>
           <div class="list-task-info" onclick="toggleCheck(${d},${task.id},${baseDay})" style="cursor:pointer">
-            <div class="list-task-name">${task.name}</div>
+            <div class="list-task-name">${esc(task.name)}</div>
             <div class="list-task-meta">
-              <span class="list-task-owner"><i class="ti ti-user" style="font-size:10px"></i>${task.owner}</span>
-              <span>${gName}</span>
+              <span class="list-task-owner"><i class="ti ti-user" style="font-size:10px"></i>${esc(task.owner)}</span>
+              <span>${esc(gName)}</span>
+              ${sop?`<a class="list-sop" href="${esc(sop)}" target="_blank" rel="noopener" draggable="false" onclick="event.stopPropagation()"><i class="ti ti-file-text" style="font-size:11px"></i>SOP</a>`:''}
               ${isOverridden?'<span class="list-moved-badge">moved this month</span>':''}
             </div>
           </div>
@@ -870,41 +1152,70 @@ function render(){
   // Panel
   const groupListHtml=S.groups.map(g=>`<div class="group-card">
     <div class="group-swatch" style="background:${g.color}"></div>
-    <span class="group-name">${g.name}</span>
+    <span class="group-name">${esc(g.name)}</span>
     <span class="group-count">${S.tasks.filter(t=>t.groupId===g.id).length} tasks</span>
     <button class="group-rm" onclick="removeGroup(${g.id})"><i class="ti ti-trash" style="font-size:12px"></i></button>
   </div>`).join('');
 
+  const ownerListHtml=S.owners.map(o=>`<div class="group-card">
+    <div class="owner-avatar">${esc(o.charAt(0).toUpperCase())}</div>
+    <span class="group-name">${esc(o)}</span>
+    <span class="group-count">${S.tasks.filter(t=>t.owner===o).length} tasks</span>
+    <button class="group-rm" data-o="${esc(o)}" onclick="removeOwner(this.dataset.o)" title="Remove team member"><i class="ti ti-trash" style="font-size:12px"></i></button>
+  </div>`).join('');
+
   const colorOpts=PALETTE.map(p=>`<div class="color-opt${selGroupColor===p.hex?' selected':''}" style="background:${p.hex}" onclick="selectGroupColor('${p.hex}')" title="${p.name}"></div>`).join('');
 
-  const allOwners=[...new Set(S.tasks.map(t=>t.owner))].sort();
-  const groupOpts=S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
-  const ownerOpts=['Alex','Jean',...allOwners.filter(o=>o!=='Alex'&&o!=='Jean')].map(o=>`<option value="${o}">${o}</option>`).join('');
+  const groupOptsFor=selId=>S.groups.map(g=>`<option value="${g.id}"${g.id===selId?' selected':''}>${esc(g.name)}</option>`).join('');
+  const ownerOptsFor=sel=>{
+    const list=[...S.owners];
+    if(sel&&!list.includes(sel))list.push(sel);
+    return list.map(o=>`<option value="${esc(o)}"${o===sel?' selected':''}>${esc(o)}</option>`).join('');
+  };
 
-  const newColor=S.groups.length>0?(S.groups.find(g=>{
-    const el=document.getElementById('nt-group');
-    return el&&g.id===parseInt(el.value);
-  })||S.groups[0]).color:'#888';
+  const newColor=groupColor(newTask.groupId);
 
   const taskListHtml=S.tasks.length===0
     ?'<div style="font-size:13px;color:var(--t3)">No tasks yet.</div>'
     :S.tasks.map(t=>{
       const col=groupColor(t.groupId);
-      const baseDays=t.weekPattern?['Pattern: '+t.weekPattern]:t.days;
+      const isEditing=editTask&&editTask.id===t.id;
+      const sop=safeUrl(t.sopUrl);
       const dayLabel=t.weekPattern?`Pattern: ${t.weekPattern}`:t.days.length>0?`Workday ${t.days.join(', ')}`:'No days';
       const pips=t.weekPattern?'<span style="font-size:11px;color:var(--t3)">Week-based pattern — edit not applicable here</span>':
         Array.from({length:31},(_,i)=>i+1).map(d=>{
           const on=t.days.includes(d);
           return `<button class="dpip${on?' on':''}" style="${on?'background:'+col+';':''}" onclick="toggleTaskDay(${t.id},${d})">${d}</button>`;
         }).join('');
-      return `<div class="ptask-row">
+      const editHtml=isEditing?`<div class="ptask-edit">
+          <div class="form-row">
+            <input type="text" id="et-name" value="${esc(editTask.name)}" maxlength="80" placeholder="Task name…" oninput="setEditField('name',this.value)"/>
+          </div>
+          <div class="form-row">
+            <span class="inline-lbl">Group</span>
+            <select id="et-group" onchange="setEditField('groupId',this.value)">${groupOptsFor(editTask.groupId)}</select>
+            <span class="inline-lbl">Owner</span>
+            <select id="et-owner" onchange="setEditField('owner',this.value)">${ownerOptsFor(editTask.owner)}</select>
+          </div>
+          <div class="form-row">
+            <input type="url" id="et-sop" value="${esc(editTask.sopUrl)}" placeholder="SOP link (optional) — paste a SharePoint, OneDrive or Google Drive URL" oninput="setEditField('sopUrl',this.value)"/>
+          </div>
+          <div class="form-row">
+            <button class="btn active" onclick="saveEditTask()"><i class="ti ti-check"></i> Save</button>
+            <button class="btn" onclick="cancelEditTask()">Cancel</button>
+          </div>
+        </div>`:'';
+      return `<div class="ptask-row${isEditing?' editing':''}">
         <div class="ptask-top">
           <div class="ptask-bar" style="background:${col}"></div>
-          <span class="ptask-name">${t.name}</span>
-          <span class="ptask-group">${groupName(t.groupId)}</span>
-          <span class="ptask-owner">${t.owner}</span>
+          <span class="ptask-name">${esc(t.name)}</span>
+          ${sop?`<a class="sop-link" href="${esc(sop)}" target="_blank" rel="noopener" title="Open SOP" style="font-size:11px"><i class="ti ti-file-text" style="font-size:12px"></i>SOP</a>`:''}
+          <span class="ptask-group">${esc(groupName(t.groupId))}</span>
+          <span class="ptask-owner">${esc(t.owner)}</span>
+          <button class="ptask-edit-btn" onclick="${isEditing?'cancelEditTask()':`startEditTask(${t.id})`}" title="Edit name, group, owner or SOP link"><i class="ti ti-pencil" style="font-size:12px"></i></button>
           <button class="ptask-rm" onclick="removeTask(${t.id})"><i class="ti ti-trash" style="font-size:12px"></i></button>
         </div>
+        ${editHtml}
         <div class="ptask-days-lbl">${dayLabel}</div>
         <div class="day-picker">${pips}</div>
       </div>`;
@@ -919,6 +1230,7 @@ function render(){
     <div class="panel-tabs">
       <button class="ptab${activeTab==='tasks'?' active':''}" onclick="switchTab('tasks')">Tasks</button>
       <button class="ptab${activeTab==='groups'?' active':''}" onclick="switchTab('groups')">Groups</button>
+      <button class="ptab${activeTab==='team'?' active':''}" onclick="switchTab('team')">Team</button>
     </div>
     <div class="psection${activeTab==='groups'?' active':''}">
       <p class="section-hint">Groups share a color. All tasks in a group show that color on the calendar and list.</p>
@@ -931,17 +1243,31 @@ function render(){
         <button class="btn" onclick="addGroup()"><i class="ti ti-plus"></i> Add group</button>
       </div>
     </div>
+    <div class="psection${activeTab==='team'?' active':''}">
+      <p class="section-hint">Team members appear in the owner dropdowns and the owner filter. To remove someone, reassign their tasks first.</p>
+      <div class="group-list">${ownerListHtml||'<div style="font-size:13px;color:var(--t3)">No team members.</div>'}</div>
+      <div class="add-form">
+        <h3>Add team member</h3>
+        <div class="form-row">
+          <input type="text" id="no-name" placeholder="Name…" maxlength="30" value="${esc(newOwnerName)}" oninput="newOwnerName=this.value" onkeydown="if(event.key==='Enter')addOwner()"/>
+          <button class="btn" onclick="addOwner()"><i class="ti ti-plus"></i> Add</button>
+        </div>
+      </div>
+    </div>
     <div class="psection${activeTab==='tasks'?' active':''}">
-      <p class="section-hint">Tasks are scheduled by workday number (skipping weekends &amp; US federal holidays). Drag on the calendar or list to reschedule for one month only.</p>
+      <p class="section-hint">Tasks are scheduled by workday number (skipping weekends &amp; US federal holidays). Drag on the calendar or list to reschedule for one month only. Click the <i class="ti ti-pencil"></i> icon to change a task's name, group, owner or SOP link. Changes here are shared with the whole team.</p>
       <div class="ptask-list">${taskListHtml}</div>
       <div class="add-form">
         <h3>Add task</h3>
         <div class="form-row">
-          <input type="text" id="nt-name" placeholder="Task name…" maxlength="80"/>
+          <input type="text" id="nt-name" placeholder="Task name…" maxlength="80" value="${esc(newTask.name)}" oninput="setNewTaskField('name',this.value)"/>
         </div>
         <div class="form-row">
-          <select id="nt-group" onchange="render()">${groupOpts}</select>
-          <select id="nt-owner">${ownerOpts}</select>
+          <select id="nt-group" onchange="setNewTaskField('groupId',this.value)">${groupOptsFor(newTask.groupId)}</select>
+          <select id="nt-owner" onchange="setNewTaskField('owner',this.value)">${ownerOptsFor(newTask.owner)}</select>
+        </div>
+        <div class="form-row">
+          <input type="url" id="nt-sop" placeholder="SOP link (optional) — paste a SharePoint, OneDrive or Google Drive URL" value="${esc(newTask.sopUrl)}" oninput="setNewTaskField('sopUrl',this.value)"/>
         </div>
         <div class="form-lbl">Workdays this task repeats (workday 1 = first business day of month):</div>
         <div class="new-dpick">${newDayPips}</div>
@@ -958,8 +1284,8 @@ function render(){
       ${unscheduled.map(({task,workday})=>`<div class="unscheduled-row">
         <div class="unscheduled-bar" style="background:${groupColor(task.groupId)}"></div>
         <div class="unscheduled-info">
-          <div class="unscheduled-name">${task.name}</div>
-          <div class="unscheduled-meta">${task.owner} · ${groupName(task.groupId)} · Workday ${workday}</div>
+          <div class="unscheduled-name">${esc(task.name)}</div>
+          <div class="unscheduled-meta">${esc(task.owner)} · ${esc(groupName(task.groupId))} · Workday ${workday}</div>
         </div>
         <button class="unscheduled-assign" onclick="openAssignModal(${task.id},${workday})"><i class="ti ti-calendar-plus" style="font-size:12px"></i> Assign day</button>
       </div>`).join('')}
@@ -984,7 +1310,7 @@ function render(){
     assignModalHtml=`<div class="modal-backdrop" onclick="if(event.target===this)closeAssignModal()">
       <div class="modal-box">
         <h3>Assign a day for this month</h3>
-        <p class="modal-sub"><strong>${task?task.name:'Task'}</strong> is normally workday ${assignModal.workday} but this month doesn't have that many workdays. Pick a workday to assign it to for ${MONTHS[S.month]} only.</p>
+        <p class="modal-sub"><strong>${task?esc(task.name):'Task'}</strong> is normally workday ${assignModal.workday} but this month doesn't have that many workdays. Pick a workday to assign it to for ${MONTHS[S.month]} only.</p>
         <div class="modal-wkday-pick">${dayBtns.join('')}</div>
         <div class="modal-actions">
           <button class="modal-cancel" onclick="closeAssignModal()">Cancel</button>
@@ -1058,10 +1384,14 @@ function listDrop(e,toDay){
  'setFilterOwner','setFilterGroup','toggleCheck','toggleTaskDay',
  'toggleNewDay','addTask','addGroup','removeTask','removeGroup',
  'selectGroupColor','onDragOver','onDragLeave','onDrop','toggleDayCollapse',
- 'listDragOver','listDragLeave','listDrop'
+ 'listDragOver','listDragLeave','listDrop',
+ 'startEditTask','setEditField','cancelEditTask','saveEditTask','setNewTaskField',
+ 'addOwner','removeOwner'
 ].forEach(fn=>window[fn]=eval(fn));
 
 window.addEventListener('load', ()=>{ render(); initDB(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') refreshFromDB(); });
+setInterval(()=>{ if(document.visibilityState==='visible') refreshFromDB(); }, 60000);
 </script>
 </body>
 </html>
