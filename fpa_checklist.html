@@ -491,7 +491,7 @@ async function sbFetch(path, opts={}){
 
 async function loadChecks(){
   const rows = await sbFetch('checks?select=*');
-  if(!rows) return {};
+  if(!Array.isArray(rows)) throw new Error('Supabase read failed'); // don't show a blank month as if it were real
   const out = {};
   rows.forEach(r=>{
     const dk = r.year+'-'+r.month+'-'+r.day;
@@ -503,7 +503,7 @@ async function loadChecks(){
 
 async function loadOverrides(){
   const rows = await sbFetch('overrides?select=*');
-  if(!rows) return {};
+  if(!Array.isArray(rows)) throw new Error('Supabase read failed'); // don't show a blank month as if it were real
   const out = {};
   rows.forEach(r=>{
     const mk = r.year+'-'+r.month;
@@ -696,19 +696,41 @@ async function syncSharedConfig(){
   return true;
 }
 
+// Last good copy of checkmarks/moves, shown if the database can't be reached
+function saveCachedChecks(){
+  try{ localStorage.setItem('fpa_cache', JSON.stringify({checks:S.checks,overrides:S.overrides,at:Date.now()})); }catch(e){}
+}
+function loadCachedChecks(){
+  try{
+    const c=JSON.parse(localStorage.getItem('fpa_cache')||'null');
+    if(c&&c.checks){ S.checks=c.checks; S.overrides=c.overrides||{}; return c.at; }
+  }catch(e){}
+  return null;
+}
+
+let initRetryTimer=null;
 async function initDB(){
   const notice = document.getElementById('save-notice');
-  if(notice) notice.textContent='Loading data…';
+  if(notice && !dbLoaded) notice.textContent='Loading data…';
+  clearTimeout(initRetryTimer);
   try {
-    S.checks = await loadChecks();
-    S.overrides = await loadOverrides();
+    const checks = await loadChecks();
+    const overrides = await loadOverrides();
+    S.checks = checks; S.overrides = overrides;
     sharedConfigOk = await syncSharedConfig();
     dbLoaded=true;
+    saveCachedChecks();
     if(notice) notice.textContent = sharedConfigOk
       ? 'Synced · '+new Date().toLocaleTimeString()
       : '⚠ Shared task list not available — showing this browser\'s copy (run the Supabase setup script)';
   } catch(e){
-    if(notice) notice.textContent='Offline — using local data';
+    console.error('Could not reach Supabase:', e);
+    const at = loadCachedChecks();
+    if(notice) notice.innerHTML = '⚠ Can\'t reach the shared database'
+      + (at ? ' — showing your last synced copy from '+new Date(at).toLocaleString() : '')
+      + '. Changes won\'t save until it reconnects. Retrying automatically… '
+      + '<a href="#" onclick="event.preventDefault();initDB()">Retry now</a>';
+    initRetryTimer = setTimeout(initDB, 15000); // keep trying every 15 seconds
   }
   render();
 }
@@ -716,18 +738,24 @@ async function initDB(){
 // Re-pull everyone's changes when you come back to the tab, and once a minute
 let refreshing=false;
 async function refreshFromDB(){
-  if(!dbLoaded||refreshing||dragTaskId)return;
+  if(!dbLoaded){ if(!refreshing) initDB(); return; } // still offline — try to connect again
+  if(refreshing||dragTaskId)return;
   const a=document.activeElement;
   if(a&&(a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'))return; // don't interrupt typing
   refreshing=true;
   try{
     const [c,o]=await Promise.all([loadChecks(),loadOverrides()]);
     S.checks=c; S.overrides=o;
+    saveCachedChecks();
     if(sharedConfigOk) await syncSharedConfig();
     const notice=document.getElementById('save-notice');
     if(notice) notice.textContent='Synced · '+new Date().toLocaleTimeString();
     render();
-  }catch(e){}
+  }catch(e){
+    // Keep what's on screen; just warn that this refresh didn't go through
+    const notice=document.getElementById('save-notice');
+    if(notice) notice.textContent='⚠ Connection problem — will retry in a minute';
+  }
   refreshing=false;
 }
 let showPanel=false;
